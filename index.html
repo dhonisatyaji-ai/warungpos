@@ -687,7 +687,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.05.2';
+const APP_VERSION = '2026.09.05.3';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1010,7 +1010,60 @@ function filterTglQs(p){
 }
 
 function onAppsScript(){
-  try { return !!(window.google && google.script && google.script.run); } catch (e) { return false; }
+  try { return !!(window.google && google.script && google.script.run && google.script.run.apiFromClient); } catch (e) { return false; }
+}
+function startGasBridge(){
+  if (onAppsScript() || !gasUrl() || document.getElementById('wpBridge')) return;
+  window._wpBridgePend = {};
+  window._wpBridgeWait = [];
+  window.addEventListener('message', function(e){
+    var d=e.data;
+    if(!d || typeof d!=='object') return;
+    if(d.t==='wp-ready'){
+      window._wpBridgeOk=true;
+      var q=window._wpBridgeWait||[];
+      window._wpBridgeWait=[];
+      q.forEach(function(fn){ try{fn();}catch(err){} });
+      return;
+    }
+    if(d.t==='wp1' && d.id && window._wpBridgePend && window._wpBridgePend[d.id]){
+      var p=window._wpBridgePend[d.id];
+      delete window._wpBridgePend[d.id];
+      if(d.ok){ try{ p.resolve(unwrapGas(d.res)); }catch(err){ p.reject(err); } }
+      else p.reject(new Error(d.err||'Gagal memproses'));
+    }
+  });
+  var f=document.createElement('iframe');
+  f.id='wpBridge';
+  f.title='wp-bridge';
+  f.setAttribute('aria-hidden','true');
+  f.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;border:0;opacity:0;pointer-events:none';
+  f.src=gasUrl()+(gasUrl().indexOf('?')>=0?'&':'?')+'bridge=1';
+  document.body.appendChild(f);
+}
+function whenBridge(ms){
+  if(window._wpBridgeOk) return Promise.resolve(true);
+  if(window._wpBridgeFail || !document.getElementById('wpBridge')) return Promise.resolve(false);
+  return new Promise(function(resolve){
+    var t=setTimeout(function(){ window._wpBridgeFail=true; resolve(false); }, ms||4000);
+    (window._wpBridgeWait=window._wpBridgeWait||[]).push(function(){ clearTimeout(t); resolve(true); });
+  });
+}
+function bridgeCall(action, payload){
+  return new Promise(function(resolve, reject){
+    var win=document.getElementById('wpBridge') && document.getElementById('wpBridge').contentWindow;
+    if(!win || !window._wpBridgeOk){ reject(new Error('Jembatan server belum siap')); return; }
+    var id='b'+Date.now()+Math.floor(Math.random()*1000000);
+    var tm=setTimeout(function(){
+      if(window._wpBridgePend[id]){ delete window._wpBridgePend[id]; reject(new Error('Waktu tunggu server habis')); }
+    }, 15000);
+    window._wpBridgePend[id]={
+      resolve:function(v){ clearTimeout(tm); resolve(v); },
+      reject:function(err){ clearTimeout(tm); reject(err); }
+    };
+    try{ win.postMessage({t:'wp0', id:id, a:action, p:payload||{}}, '*'); }
+    catch(err){ delete window._wpBridgePend[id]; reject(err); }
+  });
 }
 function gasUrl(){
   var u = String(window.WARUNGPOS_GAS_URL || CONFIG.GAS_URL || '').trim();
@@ -1080,6 +1133,13 @@ function gasRun(action, payload){
 }
 async function gasCall(action, payload){
   var last = null;
+  if (!onAppsScript() && gasUrl()) {
+    var ready = await whenBridge(4000);
+    if (ready) {
+      try { return await bridgeCall(action, payload); }
+      catch (e) { last = e; }
+    }
+  }
   if (onAppsScript() && !window._gasRunSkip) {
     try { return await gasRun(action, payload); }
     catch (e) {
@@ -1968,6 +2028,7 @@ async function prosesBayar(){
     return {produk_id:it.produk_id,qty:it.qty,is_dingin:it.is_dingin?1:0,mode_berat:it.mode_berat||'',nominal:it.nominal||0,satuan_input:it.satuan_input};
   });
   window._bayarLock=true;
+  toast('Menyimpan transaksi…');
   try{
     const res=await API('penjualan',{items,pelanggan_id,metode,bayar,diskon:t.diskon,catatan:document.getElementById('catatanKasir').value});
     if(useRemote()){
@@ -3047,9 +3108,10 @@ STATE.data=loadDB();
   } catch (e) {}
   var _sb=readSb(); if (_sb.url && _sb.key) applySb(_sb.url, _sb.key);
   try { hideGasBanner(); setTimeout(hideGasBanner, 250); setTimeout(hideGasBanner, 1200); } catch(e) {}
+  try { startGasBridge(); } catch(e) {}
   armSplashEscape();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3651e80eba6df8b',t:'MTc4ODYxMDEwNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a365fe378f71c8a7',t:'MTc4ODYxOTI2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
