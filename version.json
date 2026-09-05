@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.05.2",
+  "version": "2026.09.05.3",
   "tanggal": "2026-09-05",
   "catatan": "Menu Update dari GitHub, cetak stok opname, QRIS/transfer/debit, tambah pelanggan, perbaikan splash login."
 }
