@@ -76,17 +76,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;padding:8px 10px;border-radius:10px;font-size:13px;display:none;margin-top:10px}
 
 #app{display:grid;grid-template-columns:var(--navw) 1fr;min-height:100%}
-.sidebar{background:var(--forest);color:#ecfdf5;padding:18px 12px 88px;position:sticky;top:0;height:100vh;overflow:auto}
-.side-brand{display:flex;gap:10px;align-items:center;padding:6px 10px 16px}
-.side-brand .logo{width:40px;height:40px}
-.side-brand h1{margin:0;font-size:16px;color:#fff}
-.side-brand small{color:#a7f3d0}
-.nav-btn{width:100%;display:flex;gap:10px;align-items:center;background:transparent;border:0;color:#d1fae5;
-  padding:10px 12px;border-radius:12px;text-align:left;font-weight:600;margin-bottom:4px}
-.nav-btn svg{width:18px;height:18px;flex:none}
+.sidebar{background:var(--forest);color:#ecfdf5;padding:8px 8px 10px;position:sticky;top:0;
+  height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;overflow:hidden;
+  display:flex;flex-direction:column;min-height:0}
+.side-brand{display:flex;gap:8px;align-items:center;padding:2px 8px 8px;flex:none}
+.side-brand .logo{width:32px;height:32px;border-radius:10px}
+.side-brand h1{margin:0;font-size:14px;color:#fff;line-height:1.2}
+.side-brand small{color:#a7f3d0;font-size:11px}
+.nav-btn{width:100%;display:flex;gap:8px;align-items:center;background:transparent;border:0;color:#d1fae5;
+  padding:clamp(3px,.62vh,8px) 10px;border-radius:10px;text-align:left;font-weight:600;margin-bottom:0;
+  font-size:clamp(12px,1.32vh,14px);line-height:1.2;flex:none}
+.nav-btn svg{width:16px;height:16px;flex:none}
 .nav-btn:hover,.nav-btn.active{background:#1f5a49;color:#fff}
-.nav-sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6ee7b7;padding:12px 12px 6px}
-.side-user{margin-top:18px;padding:12px;border-radius:14px;background:#0f2a24;font-size:13px}
+.nav-sec{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#6ee7b7;
+  padding:clamp(4px,.85vh,10px) 10px 2px;flex:none}
+.side-user{margin-top:auto;padding:8px 10px;border-radius:12px;background:#0f2a24;font-size:12px;flex:none}
+.side-user .btn-sm{padding:4px 8px;font-size:11px}
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;
   background:rgba(255,250,243,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
@@ -206,7 +211,7 @@ hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}
 @media (max-width:980px){
   #app{grid-template-columns:1fr}
   .sidebar{display:none}
-  .sidebar.open{display:block;position:fixed;inset:0 auto 0 0;width:min(84vw,280px);z-index:40;height:100%}
+  .sidebar.open{display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;width:min(84vw,280px);z-index:40;height:100%;height:100dvh;overflow:hidden}
   .kasir{grid-template-columns:1fr}
   .cart{position:static}
   .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;background:#143d32;padding:8px 8px calc(8px + var(--safe-b));gap:4px;z-index:30}
@@ -328,6 +333,7 @@ html.has-session .boot-splash{display:grid}
     <button class="nav-btn" data-view="laporan" onclick="showView('laporan')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l5 5v11H6z"/><path d="M15 4v5h5M8 13h8M8 17h5"/></svg> Laporan</button>
     <div class="nav-sec">Sistem</div>
     <button class="nav-btn admin-only" data-view="user" onclick="showView('user')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3 4-4.5 7-4.5S17.6 16 19 19"/></svg> User</button>
+    <button class="nav-btn" data-view="printer" onclick="showView('printer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8V3h10v5"/><path d="M6 9h12a2 2 0 0 1 2 2v6H4v-6a2 2 0 0 1 2-2Z"/><path d="M8 17h8v4H8z"/></svg> Printer</button>
     <button class="nav-btn" data-view="pengaturan" onclick="showView('pengaturan')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.9 6.5l1.6 1.4M17.5 16.1l1.6 1.4M3 12h2M19 12h2M4.9 17.5l1.6-1.4M17.5 7.9l1.6-1.4"/></svg> Pengaturan</button>
     <button class="nav-btn" data-view="update" onclick="showView('update')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v9"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg> Update <span id="updDot" class="upd-dot app-hidden">baru</span></button>
     <div class="side-user">
@@ -567,7 +573,7 @@ html.has-session .boot-splash{display:grid}
         <input type="date" id="lapTo">
         <select id="lapKasir" onchange="renderLaporan()" style="max-width:180px"></select>
         <button class="btn" onclick="renderLaporan()">Tampilkan</button>
-        <button class="btn-ghost" onclick="window.print()">Cetak</button>
+        <button class="btn-ghost" type="button" onclick="cetakLaporan()">Cetak</button>
       </div>
       <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
         <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
@@ -657,6 +663,50 @@ html.has-session .boot-splash{display:grid}
       <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Modal awal</th><th>Omset</th><th>Pengeluaran</th><th>Modal besok</th><th>Setoran</th><th>Kasir</th></tr></thead><tbody id="tkHist"></tbody></table></div>
     </div>
 
+    <div class="view" id="view-printer">
+      <p class="hint">Struk/nota dan laporan punya pengaturan kertas sendiri. Saat dialog cetak muncul, pilih printer fisik yang sesuai (misalnya thermal untuk struk, A4 untuk laporan).</p>
+      <div class="two">
+        <div class="card">
+          <h3 style="margin:0 0 6px">Printer struk / nota</h3>
+          <p class="hint">Kasir setelah bayar, tutup kasir setoran.</p>
+          <label class="fld">Nama printer (petunjuk di dialog cetak)</label>
+          <input id="prtSNama" placeholder="Contoh: Thermal 80mm">
+          <label class="fld">Lebar kertas</label>
+          <select id="prtSKertas"><option value="80">80 mm</option><option value="58">58 mm</option></select>
+          <div class="two">
+            <div><label class="fld">Huruf (px)</label><input id="prtSFont" type="number" min="9" max="18" value="12"></div>
+            <div><label class="fld">Margin (mm)</label><input id="prtSMargin" type="number" min="0" max="20" value="4"></div>
+          </div>
+          <label class="fld">Jumlah salinan</label>
+          <input id="prtSCopies" type="number" min="1" max="5" value="1">
+          <label class="fld" style="margin-top:10px"><input type="checkbox" id="prtSAuto"> Cetak otomatis setelah transaksi</label>
+          <div class="row-btns" style="margin-top:12px">
+            <button class="btn-ghost" type="button" onclick="tesCetak('struk')">Tes cetak struk</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 6px">Printer laporan</h3>
+          <p class="hint">Laporan, lembar hitung stok opname, hasil opname.</p>
+          <label class="fld">Nama printer (petunjuk di dialog cetak)</label>
+          <input id="prtLNama" placeholder="Contoh: HP Laser A4">
+          <label class="fld">Ukuran kertas</label>
+          <select id="prtLKertas"><option value="A4">A4</option><option value="A5">A5</option><option value="Letter">Letter</option></select>
+          <label class="fld">Orientasi</label>
+          <select id="prtLOri"><option value="portrait">Tegak (portrait)</option><option value="landscape">Miring (landscape)</option></select>
+          <div class="two">
+            <div><label class="fld">Huruf (px)</label><input id="prtLFont" type="number" min="9" max="18" value="12"></div>
+            <div><label class="fld">Margin (mm)</label><input id="prtLMargin" type="number" min="0" max="25" value="10"></div>
+          </div>
+          <label class="fld">Jumlah salinan</label>
+          <input id="prtLCopies" type="number" min="1" max="5" value="1">
+          <div class="row-btns" style="margin-top:12px">
+            <button class="btn-ghost" type="button" onclick="tesCetak('laporan')">Tes cetak laporan</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn" type="button" style="margin-top:14px" onclick="simpanPrinter()">Simpan printer</button>
+    </div>
+
     <!-- PENGATURAN -->
     <div class="view" id="view-pengaturan">
       <div class="card">
@@ -710,7 +760,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.7';
+const APP_VERSION = '2026.09.06.8';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -810,7 +860,9 @@ function seed(){
   const now=nowIso();
   return {
     pengaturan:{ toko_nama:'Warung POS', toko_alamat:'Jl. Malioboro No. 1, Yogyakarta', toko_telp:'0812-3456-7890',
-      toko_footer:'Terima kasih sudah belanja. Barang yang sudah dibeli tidak dapat ditukar kecuali ada perjanjian.' },
+      toko_footer:'Terima kasih sudah belanja. Barang yang sudah dibeli tidak dapat ditukar kecuali ada perjanjian.',
+      prt_struk:{kertas:'80',font:12,margin:4,auto:0,copies:1,nama:''},
+      prt_lap:{kertas:'A4',orientasi:'portrait',font:12,margin:10,copies:1,nama:''} },
     user:[
       {id:'U1',username:'admin',password:hash('admin123'),nama:'Administrator',role:'admin',aktif:1},
       {id:'U2',username:'kasir',password:hash('kasir123'),nama:'Kasir Toko',role:'kasir',aktif:1}
@@ -1515,7 +1567,7 @@ function localReturBeli(p){
 }
 
 /* ================= UI SHELL ================= */
-const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko & koneksi cloud'],update:['Update','Pembaruan aplikasi dari GitHub']};
+const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko & koneksi cloud'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
 
 function showView(name){
   if(!TITLES[name] || !document.getElementById('view-'+name)) name='kasir';
@@ -1545,6 +1597,7 @@ function showView(name){
   if(name==='laporan'){ const t=todayStr(); document.getElementById('lapFrom').value=t.slice(0,8)+'01'; document.getElementById('lapTo').value=t; renderLaporan(); }
   if(name==='user') renderUser();
   if(name==='pengaturan') renderPengaturan();
+  if(name==='printer') renderPrinter();
   if(name==='update') renderUpdate();
 }
 function toggleSide(){
@@ -2291,7 +2344,7 @@ async function prosesBayar(){
   }catch(e){ toast(e.message); }
   finally { window._bayarLock=false; }
 }
-function struk(res){
+function buatStrukHtml(res){
   const set=STATE.data.pengaturan||{};
   const pl=find(STATE.data.pelanggan,res.pelanggan_id);
   const items=(res.items||[]).map(it=>{
@@ -2302,8 +2355,8 @@ function struk(res){
     else if(it.mode_berat) nm+=' · '+fmtQty(it.qty,it.satuan);
     return '<div style="display:flex;justify-content:space-between"><span>'+esc(nm)+'<br><small>'+fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'</small></span><span>'+rp(it.subtotal)+'</span></div>';
   }).join('');
-  const html='<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
-    '<hr class="dashline">'+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc(STATE.user.nama)+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
+  return '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
+    '<hr class="dashline">'+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc(STATE.user&&STATE.user.nama||'')+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
     '<hr class="dashline">'+items+
     '<hr class="dashline"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><span>'+rp(res.subtotal)+'</span></div>'+
     (num(res.diskon)?'<div style="display:flex;justify-content:space-between"><span>Diskon / promo</span><span>'+rp(res.diskon)+'</span></div>':'')+
@@ -2313,27 +2366,63 @@ function struk(res){
     (isNonTunai(res.metode)?'<div>Bayar pas · non-tunai (tidak masuk laci)</div>':'')+
     (res.metode==='hutang'?'<div>Masuk hutang pelanggan</div>':'')+
     (res.metode==='campuran'?'<div>Tunai '+rp(res.bayar)+' · Hutang '+rp(roundM(num(res.total)-num(res.bayar)))+'</div>':'')+
-    '<hr class="dashline"><center>'+esc(set.toko_footer||'Terima kasih')+'</center></div>'+
-    '<div class="row-btns" style="margin-top:10px"><button class="btn" onclick="printStruk()">Cetak struk</button><button class="btn-ghost" onclick="closeModal()">Tutup</button></div>';
-  modal(html);
-  document.getElementById('printArea').innerHTML=html;
+    '<hr class="dashline"><center>'+esc(set.toko_footer||'Terima kasih')+'</center></div>';
+}
+function struk(res){
+  const inner=buatStrukHtml(res);
+  modal(inner+'<div class="row-btns" style="margin-top:10px"><button class="btn" type="button" onclick="printStruk()">Cetak struk</button></div>');
+  if(num(printerCfg('struk').auto)) setTimeout(function(){ printDokumen('struk', inner); }, 280);
 }
 function printStruk(){
-  var el=document.getElementById('printArea');
-  if(el) el.classList.remove('print-wide');
-  window.print();
+  const el=document.querySelector('#modalBg .struk');
+  if(!el) return toast('Tidak ada struk untuk dicetak');
+  printDokumen('struk', el.outerHTML);
 }
-function printHtml(html, wide){
-  const css='html,body{margin:0;padding:12px;background:#fff;color:#1c1917;font:13px/1.45 sans-serif}'+
-    'table{width:100%;border-collapse:collapse;font-size:12px}'+
+function printerCfg(kind){
+  const s=(STATE.data.pengaturan||{});
+  if(kind==='struk') return Object.assign({kertas:'80',font:12,margin:4,auto:0,copies:1,nama:''}, s.prt_struk||{});
+  return Object.assign({kertas:'A4',orientasi:'portrait',font:12,margin:10,copies:1,nama:''}, s.prt_lap||{});
+}
+function printHtml(html, wide){ printDokumen(wide?'laporan':'struk', html); }
+function printDokumen(kind, html){
+  const cfg=printerCfg(kind);
+  const isStruk=kind==='struk';
+  const font=Math.max(9, Math.min(18, num(cfg.font)||12));
+  const margin=Math.max(0, Math.min(25, num(cfg.margin)));
+  const copies=Math.max(1, Math.min(5, num(cfg.copies)||1));
+  let size, width;
+  if(isStruk){
+    const mm=String(cfg.kertas)==='58'?'58mm':'80mm';
+    size=mm+' auto';
+    width=mm;
+  } else {
+    const kertas=cfg.kertas||'A4';
+    const ori=cfg.orientasi==='landscape'?'landscape':'portrait';
+    size=kertas+' '+ori;
+    width='auto';
+  }
+  const pad=Math.max(isStruk?2:6, margin)+'mm';
+  const css='html,body{margin:0;padding:'+pad+';background:#fff;color:#111;font:'+font+'px/1.45 sans-serif}'+
+    (isStruk?'html,body{width:'+width+';max-width:'+width+'}':'')+
+    'table{width:100%;border-collapse:collapse;font-size:'+Math.max(9,font-1)+'px}'+
     'th,td{border:1px solid #111;padding:6px 8px;vertical-align:middle}'+
     'th{background:#f3ece1;text-align:left}'+
     'td.isi-fisik{height:28px;min-width:90px}'+
+    '.struk{width:100%;margin:0;font:'+font+'px/1.4 ui-monospace,Menlo,monospace}'+
+    'hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}'+
     '.op-ttd{display:flex;justify-content:space-between;gap:12px;margin-top:28px;text-align:center;font-size:12px}'+
     '.op-ttd div{flex:1}.op-ttd .garis{margin-top:48px;border-top:1px solid #111;padding-top:6px}'+
-    '@page{margin:10mm}@media print{body{padding:0}}';
+    '@page{size:'+size+';margin:'+margin+'mm}'+
+    '@media print{body{padding:0}}';
+  let body=html;
+  if(copies>1){
+    const parts=[];
+    for(var i=0;i<copies;i++) parts.push('<div>'+html+'</div>');
+    body=parts.join('<div style="page-break-after:always;height:0"></div>');
+  }
+  const title=(isStruk?'Struk / nota':'Laporan')+(cfg.nama?(' — '+cfg.nama):'');
   const doc='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">'+
-    '<title>Cetak</title><style>'+css+'</style></head><body>'+html+'</body><'+'/html>';
+    '<title>'+esc(title)+'</title><style>'+css+'</style></head><body>'+body+'</body><'+'/html>';
   let w=null;
   try{ w=window.open('', '_blank'); }catch(e){ w=null; }
   if(w && w.document){
@@ -2344,7 +2433,7 @@ function printHtml(html, wide){
   const el=document.getElementById('printArea');
   if(!el) return toast('Izinkan pop-up untuk mencetak');
   el.classList.remove('app-hidden');
-  el.classList.toggle('print-struk', !wide);
+  el.classList.toggle('print-struk', isStruk);
   el.innerHTML=html;
   setTimeout(function(){
     window.print();
@@ -3063,6 +3152,79 @@ function pasangUpdate(){
   }
   location.replace(dest);
 }
+
+function renderPrinter(){
+  const s=printerCfg('struk'), l=printerCfg('laporan');
+  const set=function(id,v){ const el=document.getElementById(id); if(el) el.value=v; };
+  set('prtSNama', s.nama||'');
+  set('prtSKertas', s.kertas||'80');
+  set('prtSFont', s.font||12);
+  set('prtSMargin', s.margin);
+  set('prtSCopies', s.copies||1);
+  const au=document.getElementById('prtSAuto'); if(au) au.checked=!!num(s.auto);
+  set('prtLNama', l.nama||'');
+  set('prtLKertas', l.kertas||'A4');
+  set('prtLOri', l.orientasi||'portrait');
+  set('prtLFont', l.font||12);
+  set('prtLMargin', l.margin||10);
+  set('prtLCopies', l.copies||1);
+}
+function simpanPrinter(quiet){
+  persistPengaturan({
+    prt_struk:{
+      nama:(document.getElementById('prtSNama').value||'').trim(),
+      kertas:document.getElementById('prtSKertas').value||'80',
+      font:num(document.getElementById('prtSFont').value)||12,
+      margin:num(document.getElementById('prtSMargin').value),
+      copies:Math.max(1, num(document.getElementById('prtSCopies').value)||1),
+      auto:document.getElementById('prtSAuto').checked?1:0
+    },
+    prt_lap:{
+      nama:(document.getElementById('prtLNama').value||'').trim(),
+      kertas:document.getElementById('prtLKertas').value||'A4',
+      orientasi:document.getElementById('prtLOri').value||'portrait',
+      font:num(document.getElementById('prtLFont').value)||12,
+      margin:num(document.getElementById('prtLMargin').value),
+      copies:Math.max(1, num(document.getElementById('prtLCopies').value)||1)
+    }
+  });
+  if(!quiet) toast('Pengaturan printer disimpan');
+}
+function tesCetak(kind){
+  simpanPrinter(true);
+  const set=STATE.data.pengaturan||{};
+  if(kind==='struk'){
+    printDokumen('struk', '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>TES CETAK STRUK / NOTA<br>'+esc(nowIso())+
+      '<hr class="dashline"><div style="display:flex;justify-content:space-between"><span>Item contoh<br><small>1 x '+rp(1000)+'</small></span><span>'+rp(1000)+'</span></div>'+
+      '<hr class="dashline"><center>Printer struk siap</center></div>');
+  } else {
+    printDokumen('laporan', '<div><b style="font-size:18px">'+esc(set.toko_nama||'WarungPOS')+'</b><h2>Tes cetak laporan</h2>'+
+      '<table><thead><tr><th>Kolom</th><th>Nilai</th></tr></thead><tbody>'+
+      '<tr><td>Tanggal</td><td>'+esc(todayStr())+'</td></tr>'+
+      '<tr><td>Kertas</td><td>'+esc(printerCfg('laporan').kertas)+' '+esc(printerCfg('laporan').orientasi)+'</td></tr>'+
+      '</tbody></table><p>Printer laporan siap.</p></div>');
+  }
+}
+function cetakLaporan(){
+  const set=STATE.data.pengaturan||{};
+  const jenis=document.getElementById('lapJenis');
+  const from=(document.getElementById('lapFrom')||{}).value||'';
+  const to=(document.getElementById('lapTo')||{}).value||'';
+  const body=(document.getElementById('lapBody')||{}).innerHTML||'';
+  if(!body || body.indexOf('Tidak ada data')>=0) return toast('Tidak ada data laporan');
+  const judul=(jenis && jenis.options[jenis.selectedIndex])?jenis.options[jenis.selectedIndex].text:'Laporan';
+  const kasirEl=document.getElementById('lapKasir');
+  const kasir=(kasirEl && kasirEl.options[kasirEl.selectedIndex])?kasirEl.options[kasirEl.selectedIndex].text:'';
+  const html='<div><b style="font-size:18px">'+esc(set.toko_nama||'WarungPOS')+'</b><br><span>'+esc(set.toko_alamat||'')+'</span>'+
+    '<h2 style="margin:10px 0 6px">'+esc(judul)+'</h2>'+
+    '<p style="margin:0 0 10px">Periode '+esc(from)+' s/d '+esc(to)+(kasir?' · '+esc(kasir):'')+'</p>'+
+    '<table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th></tr></thead>'+
+    '<tbody>'+body+'</tbody></table>'+
+    '<p style="margin-top:10px">Jumlah '+(document.getElementById('lapCount')||{}).textContent+' · Total '+(document.getElementById('lapTotal')||{}).textContent+'</p>'+
+    '<p style="font-size:11px">Dicetak '+esc(nowIso())+' · '+esc((STATE.user&&STATE.user.nama)||'')+'</p></div>';
+  printDokumen('laporan', html);
+}
+
 function renderPengaturan(){
   const s=STATE.data.pengaturan||{};
   document.getElementById('setNama').value=s.toko_nama||'';
@@ -3525,5 +3687,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36af722aa1adf7c',t:'MTc4ODY3MTQwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36b74e6ca47df93',t:'MTc4ODY3NjU1Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
