@@ -1,0 +1,1142 @@
+/**
+ * WarungPOS — Backend Google Apps Script
+ * Spreadsheet sebagai database. Deploy sebagai Web App.
+ * Execute as: Me | Who has access: Anyone
+ */
+
+const TZ = 'Asia/Jakarta';
+const SHEETS = {
+  PENGATURAN: 'Pengaturan',
+  USER: 'User',
+  KATEGORI: 'Kategori',
+  JENIS: 'Jenis',
+  SUPPLIER: 'Supplier',
+  PELANGGAN: 'Pelanggan',
+  PRODUK: 'Produk',
+  PENJUALAN: 'Penjualan',
+  PENJUALAN_ITEM: 'PenjualanItem',
+  PEMBELIAN: 'Pembelian',
+  PEMBELIAN_ITEM: 'PembelianItem',
+  RETUR_JUAL: 'ReturPenjualan',
+  RETUR_JUAL_ITEM: 'ReturPenjualanItem',
+  RETUR_BELI: 'ReturPembelian',
+  RETUR_BELI_ITEM: 'ReturPembelianItem',
+  HUTANG: 'Hutang',
+  LOG: 'Log'
+};
+
+const HEADERS = {
+  Pengaturan: ['kunci', 'nilai'],
+  User: ['id', 'username', 'password', 'nama', 'role', 'aktif', 'created_at'],
+  Kategori: ['id', 'nama', 'warna', 'aktif'],
+  Jenis: ['id', 'nama', 'kode', 'deskripsi', 'aktif'],
+  Supplier: ['id', 'nama', 'telp', 'alamat', 'aktif'],
+  Pelanggan: ['id', 'nama', 'telp', 'alamat', 'saldo_hutang', 'aktif', 'created_at'],
+  Produk: [
+    'id', 'sku', 'barcode', 'nama', 'kategori_id', 'jenis_id', 'supplier_id',
+    'satuan', 'harga_beli', 'harga_jual', 'harga_dingin', 'stok', 'stok_min',
+    'aktif', 'created_at', 'updated_at'
+  ],
+  Penjualan: [
+    'id', 'nomor', 'tanggal', 'pelanggan_id', 'user_id', 'subtotal', 'diskon',
+    'total', 'bayar', 'kembalian', 'metode', 'status', 'catatan'
+  ],
+  PenjualanItem: [
+    'id', 'penjualan_id', 'produk_id', 'nama_produk', 'qty', 'satuan',
+    'harga_satuan', 'is_dingin', 'mode_berat', 'nominal', 'subtotal'
+  ],
+  Pembelian: ['id', 'nomor', 'tanggal', 'supplier_id', 'user_id', 'total', 'status', 'catatan'],
+  PembelianItem: ['id', 'pembelian_id', 'produk_id', 'nama_produk', 'qty', 'harga_beli', 'subtotal'],
+  ReturPenjualan: ['id', 'nomor', 'penjualan_id', 'tanggal', 'user_id', 'total', 'alasan', 'metode_refund'],
+  ReturPenjualanItem: ['id', 'retur_id', 'produk_id', 'nama_produk', 'qty', 'harga', 'subtotal'],
+  ReturPembelian: ['id', 'nomor', 'pembelian_id', 'tanggal', 'user_id', 'total', 'alasan'],
+  ReturPembelianItem: ['id', 'retur_id', 'produk_id', 'nama_produk', 'qty', 'harga', 'subtotal'],
+  Hutang: [
+    'id', 'pelanggan_id', 'tanggal', 'jenis', 'referensi', 'jumlah',
+    'saldo_sebelum', 'saldo_sesudah', 'keterangan', 'user_id'
+  ],
+  Log: ['id', 'waktu', 'user_id', 'aksi', 'detail'],
+  Kas: ['id', 'tanggal', 'jenis', 'jumlah', 'keterangan', 'user_id', 'referensi'],
+  TutupKasir: ['id', 'tanggal', 'modal_awal', 'omset', 'pengeluaran', 'modal_besok', 'setoran', 'rincian', 'user_id', 'created_at', 'catatan'],
+  Opname: ['id', 'nomor', 'tanggal', 'user_id', 'catatan', 'jumlah_item'],
+  OpnameItem: ['id', 'opname_id', 'produk_id', 'nama_produk', 'stok_sistem', 'stok_fisik', 'selisih', 'satuan']
+};
+
+/* ===================== HTTP ===================== */
+
+
+function bridgeHtml_() {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>WP</title></head><body><script>' +
+    '(function(){' +
+    'function send(m){try{parent.postMessage(m,"*");}catch(e){}}' +
+    'window.addEventListener("message",function(e){' +
+      'var d=e.data;if(!d||d.t!=="wp0")return;' +
+      'try{' +
+        'google.script.run' +
+          '.withSuccessHandler(function(r){send({t:"wp1",id:d.id,ok:true,res:r});})' +
+          '.withFailureHandler(function(err){send({t:"wp1",id:d.id,ok:false,err:String(err&&err.message||err)});})' +
+          '.apiFromClient(d.a,d.p||{});' +
+      '}catch(err){send({t:"wp1",id:d.id,ok:false,err:String(err&&err.message||err)});}' +
+    '});' +
+    'send({t:"wp-ready"});' +
+    '})();' +
+    '</script></body></html>';
+}
+
+function doGet(e) {
+  var p = parseParams_(e);
+  if (String(p.bridge || '') === '1') {
+    return HtmlService.createHtmlOutput(bridgeHtml_())
+      .setTitle('WarungPOS')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  if (p.action || p.a || p.callback) {
+    return respond_(handle_(p), e);
+  }
+  var tpl = HtmlService.createTemplateFromFile('Index');
+  tpl.GAS_URL = ScriptApp.getService().getUrl();
+  return tpl.evaluate()
+    .setTitle('WarungPOS')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+function apiFromClient(action, payload) {
+  if (action && typeof action === 'object' && payload == null) {
+    payload = action.payload || action.data || {};
+    action = action.action || action.a || '';
+  }
+  var r = handle_({ action: action, payload: payload || {} });
+  try { return JSON.parse(JSON.stringify(r)); } catch (e) { return r; }
+}
+
+function doPost(e) {
+  let params = {};
+  try {
+    if (e.postData && e.postData.contents) {
+      const raw = e.postData.contents;
+      try {
+        params = JSON.parse(raw);
+      } catch (err) {
+        params = parseQuery_(raw);
+      }
+    }
+  } catch (err) {
+    params = {};
+  }
+  Object.assign(params, parseParams_(e));
+  return respond_(handle_(params), e);
+}
+
+function parseParams_(e) {
+  const p = {};
+  if (e && e.parameter) {
+    Object.keys(e.parameter).forEach(function (k) { p[k] = e.parameter[k]; });
+  }
+  return p;
+}
+
+function parseQuery_(s) {
+  const o = {};
+  String(s || '').split('&').forEach(function (pair) {
+    const i = pair.indexOf('=');
+    if (i > -1) o[decodeURIComponent(pair.slice(0, i))] = decodeURIComponent(pair.slice(i + 1).replace(/\+/g, ' '));
+  });
+  return o;
+}
+
+function respond_(data, e) {
+  const cb = e && e.parameter && e.parameter.callback;
+  const json = JSON.stringify(data);
+  if (cb) {
+    return ContentService.createTextOutput(cb + '(' + json + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+
+function ok_(data) { return { ok: true, data: data }; }
+function fail_(msg) { return { ok: false, error: String(msg || 'Terjadi kesalahan') }; }
+
+function handle_(p) {
+  try {
+    ensureSetup_();
+    const action = String(p.action || p.a || '').trim();
+    let payload = p.payload || p.data || p;
+    if (typeof payload === 'string') {
+      try { payload = JSON.parse(payload); } catch (e) { /* keep */ }
+    }
+    switch (action) {
+      case 'ping': return ok_({ pong: true, waktu: nowIso_() });
+      case 'setup': return ok_(ensureSetup_(true));
+      case 'bootstrap': return ok_(bootstrap_());
+      case 'login': return login_(payload);
+      case 'dashboard': return ok_(dashboard_());
+      case 'getPengaturan': return ok_(getPengaturan_());
+      case 'savePengaturan': return savePengaturan_(payload);
+      case 'getUsers': return ok_(rows_('User'));
+      case 'saveUser': return saveUser_(payload);
+      case 'deleteUser': return deleteById_('User', payload.id);
+      case 'getKategori': return ok_(rows_('Kategori'));
+      case 'saveKategori': return saveRow_('Kategori', payload, ['nama', 'warna', 'aktif']);
+      case 'deleteKategori': return deleteById_('Kategori', payload.id);
+      case 'getJenis': return ok_(rows_('Jenis'));
+      case 'saveJenis': return saveRow_('Jenis', payload, ['nama', 'kode', 'deskripsi', 'aktif']);
+      case 'deleteJenis': return deleteById_('Jenis', payload.id);
+      case 'getSupplier': return ok_(rows_('Supplier'));
+      case 'saveSupplier': return saveRow_('Supplier', payload, ['nama', 'telp', 'alamat', 'aktif']);
+      case 'deleteSupplier': return deleteById_('Supplier', payload.id);
+      case 'getPelanggan': return ok_(rows_('Pelanggan'));
+      case 'savePelanggan': return savePelanggan_(payload);
+      case 'deletePelanggan': return deleteById_('Pelanggan', payload.id);
+      case 'getProduk': return ok_(rows_('Produk'));
+      case 'saveProduk': return saveProduk_(payload);
+      case 'deleteProduk': return deleteById_('Produk', payload.id);
+      case 'adjustStok': return adjustStok_(payload);
+      case 'penjualan': return penjualan_(payload);
+      case 'getPenjualan': return ok_(listTrans_('Penjualan', payload));
+      case 'getPenjualanDetail': return ok_(detailTrans_('Penjualan', 'PenjualanItem', 'penjualan_id', payload.id));
+      case 'pembelian': return pembelian_(payload);
+      case 'getPembelian': return ok_(listTrans_('Pembelian', payload));
+      case 'getPembelianDetail': return ok_(detailTrans_('Pembelian', 'PembelianItem', 'pembelian_id', payload.id));
+      case 'returPenjualan': return returPenjualan_(payload);
+      case 'getReturPenjualan': return ok_(listTrans_('ReturPenjualan', payload));
+      case 'getReturPenjualanDetail': return ok_(detailTrans_('ReturPenjualan', 'ReturPenjualanItem', 'retur_id', payload.id));
+      case 'returPembelian': return returPembelian_(payload);
+      case 'getReturPembelian': return ok_(listTrans_('ReturPembelian', payload));
+      case 'getReturPembelianDetail': return ok_(detailTrans_('ReturPembelian', 'ReturPembelianItem', 'retur_id', payload.id));
+      case 'getHutang': return ok_(ringkasanHutang_());
+      case 'getHutangDetail': return ok_(detailHutang_(payload.pelanggan_id || payload.id));
+      case 'bayarHutang': return bayarHutang_(payload);
+      case 'getLaporan': return ok_(laporan_(payload));
+      case 'getLedger': return ok_(ledger_());
+      case 'getKas': return ok_(rows_('Kas'));
+      case 'saveKas': return saveKas_(payload);
+      case 'getTutupKasir': return ok_(rows_('TutupKasir'));
+      case 'saveTutupKasir': return saveTutupKasir_(payload);
+      case 'opname': return opname_(payload);
+      case 'getOpname': return ok_(listTrans_('Opname', payload || {}));
+      case 'getOpnameDetail': return ok_(detailTrans_('Opname', 'OpnameItem', 'opname_id', payload.id));
+      default: return fail_('Aksi tidak dikenal: ' + action);
+    }
+  } catch (err) {
+    return fail_(err.message || err);
+  }
+}
+
+/* ===================== SETUP ===================== */
+
+function ensureSetup_(force) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(HEADERS).forEach(function (name) {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    const headers = HEADERS[name];
+    const existing = sh.getRange(1, 1, 1, Math.max(headers.length, sh.getLastColumn() || 1)).getValues()[0];
+    const empty = !existing[0];
+    if (empty || force) {
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff');
+      sh.setFrozenRows(1);
+    }
+  });
+  const setSheet = ss.getSheetByName('Pengaturan');
+  if (setSheet.getLastRow() < 2) seed_(ss);
+  hideGrid_();
+  return { spreadsheetId: ss.getId(), nama: ss.getName() };
+}
+
+function hideGrid_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const keep = Object.keys(HEADERS);
+  ss.getSheets().forEach(function (sh) {
+    if (keep.indexOf(sh.getName()) === -1 && ss.getSheets().length > 1) {
+      try { ss.deleteSheet(sh); } catch (e) {}
+    }
+  });
+}
+
+function seed_(ss) {
+  const now = nowIso_();
+  putMap_('Pengaturan', {
+    toko_nama: 'Warung POS',
+    toko_alamat: 'Jl. Malioboro No. 1, Yogyakarta',
+    toko_telp: '0812-3456-7890',
+    toko_footer: 'Terima kasih sudah belanja. Barang yang sudah dibeli tidak dapat ditukar kecuali ada perjanjian.',
+    pajak_persen: '0',
+    struk_lebar: '80'
+  });
+
+  appendObj_('User', { id: 'U1', username: 'admin', password: hash_('admin123'), nama: 'Administrator', role: 'admin', aktif: 1, created_at: now });
+  appendObj_('User', { id: 'U2', username: 'kasir', password: hash_('kasir123'), nama: 'Kasir Toko', role: 'kasir', aktif: 1, created_at: now });
+
+  appendObj_('Kategori', { id: 'K1', nama: 'Minuman', warna: '#0ea5e9', aktif: 1 });
+  appendObj_('Kategori', { id: 'K2', nama: 'Sembako', warna: '#f59e0b', aktif: 1 });
+  appendObj_('Kategori', { id: 'K3', nama: 'Rokok', warna: '#64748b', aktif: 1 });
+  appendObj_('Kategori', { id: 'K4', nama: 'Snack', warna: '#ec4899', aktif: 1 });
+  appendObj_('Kategori', { id: 'K5', nama: 'Sayur & Bumbu', warna: '#22c55e', aktif: 1 });
+
+  appendObj_('Jenis', { id: 'J1', nama: 'Satuan', kode: 'satuan', deskripsi: 'Harga per pcs/bungkus/pak', aktif: 1 });
+  appendObj_('Jenis', { id: 'J2', nama: 'Minuman', kode: 'minuman', deskripsi: 'Dua harga: biasa dan dingin', aktif: 1 });
+  appendObj_('Jenis', { id: 'J3', nama: 'Berat', kode: 'berat', deskripsi: 'Bisa beli per berat atau per nominal', aktif: 1 });
+
+  appendObj_('Supplier', { id: 'S1', nama: 'CV Sumber Rejeki', telp: '08111111111', alamat: 'Yogyakarta', aktif: 1 });
+  appendObj_('Supplier', { id: 'S2', nama: 'PT Indogrosir', telp: '08222222222', alamat: 'Sleman', aktif: 1 });
+
+  appendObj_('Pelanggan', { id: 'P0', nama: 'Umum', telp: '-', alamat: '-', saldo_hutang: 0, aktif: 1, created_at: now });
+  appendObj_('Pelanggan', { id: 'P1', nama: 'Heri', telp: '081234567890', alamat: 'Depok, Sleman', saldo_hutang: 0, aktif: 1, created_at: now });
+  appendObj_('Pelanggan', { id: 'P2', nama: 'Siti Aminah', telp: '082198765432', alamat: 'Kota Yogyakarta', saldo_hutang: 0, aktif: 1, created_at: now });
+
+  const produk = [
+    { id: 'PR1', sku: 'MNM-001', barcode: '8999999001', nama: 'Golda Coffee', kategori_id: 'K1', jenis_id: 'J2', supplier_id: 'S1', satuan: 'pcs', harga_beli: 2800, harga_jual: 3500, harga_dingin: 4000, stok: 48, stok_min: 10 },
+    { id: 'PR2', sku: 'MNM-002', barcode: '8999999002', nama: 'Teh Pucuk Harum', kategori_id: 'K1', jenis_id: 'J2', supplier_id: 'S1', satuan: 'pcs', harga_beli: 3200, harga_jual: 4000, harga_dingin: 4500, stok: 36, stok_min: 10 },
+    { id: 'PR3', sku: 'MNM-003', barcode: '8999999003', nama: 'Aqua 600ml', kategori_id: 'K1', jenis_id: 'J2', supplier_id: 'S2', satuan: 'pcs', harga_beli: 2500, harga_jual: 3000, harga_dingin: 3500, stok: 60, stok_min: 12 },
+    { id: 'PR4', sku: 'SMB-001', barcode: '8999999004', nama: 'Bawang Merah', kategori_id: 'K5', jenis_id: 'J3', supplier_id: 'S1', satuan: 'kg', harga_beli: 32000, harga_jual: 40000, harga_dingin: 0, stok: 12.5, stok_min: 2 },
+    { id: 'PR5', sku: 'SMB-002', barcode: '8999999005', nama: 'Beras Premium', kategori_id: 'K2', jenis_id: 'J3', supplier_id: 'S2', satuan: 'kg', harga_beli: 12000, harga_jual: 14000, harga_dingin: 0, stok: 50, stok_min: 10 },
+    { id: 'PR6', sku: 'SMB-003', barcode: '8999999006', nama: 'Minyak Goreng', kategori_id: 'K2', jenis_id: 'J3', supplier_id: 'S2', satuan: 'liter', harga_beli: 15000, harga_jual: 18000, harga_dingin: 0, stok: 20, stok_min: 5 },
+    { id: 'PR7', sku: 'SMB-004', barcode: '8999999007', nama: 'Gula Pasir', kategori_id: 'K2', jenis_id: 'J3', supplier_id: 'S1', satuan: 'kg', harga_beli: 14000, harga_jual: 16000, harga_dingin: 0, stok: 25, stok_min: 5 },
+    { id: 'PR8', sku: 'RKK-001', barcode: '8999999008', nama: 'Rokok Sampoerna Mild', kategori_id: 'K3', jenis_id: 'J1', supplier_id: 'S2', satuan: 'pcs', harga_beli: 22000, harga_jual: 25000, harga_dingin: 0, stok: 40, stok_min: 8 },
+    { id: 'PR9', sku: 'RKK-002', barcode: '8999999009', nama: 'Rokok Magnum Filter', kategori_id: 'K3', jenis_id: 'J1', supplier_id: 'S2', satuan: 'pcs', harga_beli: 18000, harga_jual: 20000, harga_dingin: 0, stok: 30, stok_min: 8 },
+    { id: 'PR10', sku: 'SNK-001', barcode: '8999999010', nama: 'Indomie Goreng', kategori_id: 'K4', jenis_id: 'J1', supplier_id: 'S1', satuan: 'pcs', harga_beli: 2800, harga_jual: 3500, harga_dingin: 0, stok: 80, stok_min: 20 }
+  ];
+  produk.forEach(function (pr) {
+    pr.aktif = 1;
+    pr.created_at = now;
+    pr.updated_at = now;
+    appendObj_('Produk', pr);
+  });
+}
+
+/* ===================== AUTH ===================== */
+
+function bootstrap_() {
+  return {
+    pengaturan: getPengaturan_(),
+    kategori: rows_('Kategori'),
+    jenis: rows_('Jenis'),
+    supplier: rows_('Supplier'),
+    pelanggan: rows_('Pelanggan'),
+    produk: rows_('Produk'),
+    user: rows_('User'),
+    penjualan: listTrans_('Penjualan', {}),
+    pembelian: listTrans_('Pembelian', {}),
+    returJual: listTrans_('ReturPenjualan', {}),
+    returBeli: listTrans_('ReturPembelian', {}),
+    kas: rows_('Kas'),
+    tutupKasir: rows_('TutupKasir'),
+    opname: rows_('Opname')
+  };
+}
+
+function ledger_() {
+  return {
+    penjualanItem: rows_('PenjualanItem'),
+    pembelianItem: rows_('PembelianItem'),
+    returJualItem: rows_('ReturPenjualanItem'),
+    returBeliItem: rows_('ReturPembelianItem'),
+    hutang: rows_('Hutang'),
+    kas: rows_('Kas'),
+    tutupKasir: rows_('TutupKasir'),
+    opnameItem: rows_('OpnameItem')
+  };
+}
+
+function saveKas_(p) {
+  p = p || {};
+  var jenis = String(p.jenis || '');
+  if (jenis !== 'masuk' && jenis !== 'keluar') return fail_('Jenis kas tidak valid');
+  var jumlah = num_(p.jumlah);
+  if (jumlah <= 0) return fail_('Nominal tidak valid');
+  var row = {
+    id: uid_('KS'),
+    tanggal: p.tanggal || nowIso_(),
+    jenis: jenis,
+    jumlah: jumlah,
+    keterangan: p.keterangan || '',
+    user_id: p.user_id || '',
+    referensi: p.referensi || ''
+  };
+  appendObj_('Kas', row);
+  return ok_(row);
+}
+
+function tglStr_(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) {
+    return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+  }
+  return String(v || '').slice(0, 10);
+}
+
+function saveTutupKasir_(p) {
+  p = p || {};
+  var tgl = tglStr_(p.tanggal || todayStr_());
+  var rincian = p.rincian;
+  if (rincian && typeof rincian !== 'string') {
+    try { rincian = JSON.stringify(rincian); } catch (e) { rincian = '{}'; }
+  }
+  var row = {
+    id: p.id || uid_('TK'),
+    tanggal: tgl,
+    modal_awal: num_(p.modal_awal),
+    omset: num_(p.omset),
+    pengeluaran: num_(p.pengeluaran),
+    modal_besok: num_(p.modal_besok),
+    setoran: num_(p.setoran),
+    rincian: rincian || '{}',
+    user_id: p.user_id || '',
+    created_at: p.created_at || nowIso_(),
+    catatan: p.catatan || ''
+  };
+  var all = rows_('TutupKasir');
+  var exist = null;
+  var uidk = String(row.user_id || '');
+  for (var i = 0; i < all.length; i++) {
+    if (tglStr_(all[i].tanggal) === tgl && String(all[i].user_id || '') === uidk) { exist = all[i]; break; }
+  }
+  if (exist) {
+    row.id = exist.id;
+    updateFields_('TutupKasir', exist.id, row);
+  } else {
+    appendObj_('TutupKasir', row);
+  }
+  return ok_(row);
+}
+
+function opname_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    p = p || {};
+    const raw = p.items || [];
+    const items = [];
+    for (let i = 0; i < raw.length; i++) {
+      const it = raw[i];
+      if (it == null) continue;
+      if (it.stok_fisik === '' || it.stok_fisik == null) continue;
+      if (String(it.stok_fisik).trim() === '') continue;
+      items.push(it);
+    }
+    if (!items.length) return fail_('Isi stok fisik minimal satu produk');
+    const id = uid_('OP');
+    const nomor = nomor_('OP');
+    const tanggal = p.tanggal || nowIso_();
+    const norm = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const pr = findById_('Produk', it.produk_id);
+      if (!pr) return fail_('Produk tidak ditemukan');
+      const fisik = num_(it.stok_fisik);
+      if (fisik < 0) return fail_('Stok fisik tidak boleh minus');
+      const sist = num_(pr.stok);
+      norm.push({
+        pr: pr,
+        stok_sistem: sist,
+        stok_fisik: fisik,
+        selisih: roundQty_(fisik - sist)
+      });
+    }
+    appendObj_('Opname', {
+      id: id,
+      nomor: nomor,
+      tanggal: tanggal,
+      user_id: p.user_id || '',
+      catatan: p.catatan || '',
+      jumlah_item: norm.length
+    });
+    norm.forEach(function (n) {
+      appendObj_('OpnameItem', {
+        id: uid_('OI'),
+        opname_id: id,
+        produk_id: n.pr.id,
+        nama_produk: n.pr.nama,
+        stok_sistem: n.stok_sistem,
+        stok_fisik: n.stok_fisik,
+        selisih: n.selisih,
+        satuan: n.pr.satuan || ''
+      });
+      updateFields_('Produk', n.pr.id, {
+        stok: roundQty_(n.stok_fisik),
+        updated_at: nowIso_()
+      });
+    });
+    log_(p.user_id, 'opname', nomor);
+    return ok_({ id: id, nomor: nomor, jumlah_item: norm.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function login_(p) {
+  const username = String((p && p.username) || '').trim().toLowerCase();
+  const password = String((p && (p.password || p.pwd || p.pass)) || '');
+  if (!username || !password) return fail_('Username dan password wajib diisi');
+  const users = rows_('User');
+  const u = users.filter(function (x) {
+    return String(x.username).toLowerCase() === username && Number(x.aktif) === 1;
+  })[0];
+  if (!u) return fail_('User tidak ditemukan atau nonaktif');
+  if (String(u.password) !== hash_(password) && String(u.password) !== password) return fail_('Password salah');
+  log_((p && p.user_id) || u.id, 'login', u.username);
+  return ok_({
+    id: u.id,
+    username: u.username,
+    nama: u.nama,
+    role: u.role,
+    token: hash_(u.id + '|' + nowIso_())
+  });
+}
+
+function hash_(s) {
+  const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8);
+  return raw.map(function (b) {
+    const v = (b < 0 ? b + 256 : b).toString(16);
+    return v.length === 1 ? '0' + v : v;
+  }).join('');
+}
+
+/* ===================== PENGATURAN / USER ===================== */
+
+function getPengaturan_() {
+  const sh = sheet_('Pengaturan');
+  const values = sh.getDataRange().getValues();
+  const o = {};
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0]) o[values[i][0]] = values[i][1];
+  }
+  return o;
+}
+
+function savePengaturan_(p) {
+  if (!p || typeof p !== 'object') return fail_('Data kosong');
+  const cur = getPengaturan_();
+  Object.keys(p).forEach(function (k) {
+    if (k === 'action' || k === 'payload') return;
+    cur[k] = p[k];
+  });
+  putMap_('Pengaturan', cur);
+  return ok_(cur);
+}
+
+function saveUser_(p) {
+  if (!p.username || !p.nama) return fail_('Username dan nama wajib');
+  const all = rows_('User');
+  const dup = all.filter(function (u) {
+    return String(u.username).toLowerCase() === String(p.username).toLowerCase() && u.id !== p.id;
+  })[0];
+  if (dup) return fail_('Username sudah dipakai');
+  if (p.password) p.password = hash_(p.password);
+  else if (p.id) {
+    const old = all.filter(function (u) { return u.id === p.id; })[0];
+    if (old) p.password = old.password;
+  }
+  if (!p.password) return fail_('Password wajib untuk user baru');
+  p.role = p.role || 'kasir';
+  p.aktif = p.aktif === 0 || p.aktif === '0' ? 0 : 1;
+  p.created_at = p.created_at || nowIso_();
+  return saveRow_('User', p, ['username', 'password', 'nama', 'role', 'aktif', 'created_at']);
+}
+
+function savePelanggan_(p) {
+  p.nama = String(p.nama || '').trim();
+  if (!p.nama) return fail_('Nama pelanggan wajib');
+  p.telp = String(p.telp || '').trim();
+  p.alamat = String(p.alamat || '').trim();
+  if (!p.id) p.saldo_hutang = Number(p.saldo_hutang || 0);
+  else {
+    const old = findById_('Pelanggan', p.id);
+    p.saldo_hutang = old ? Number(old.saldo_hutang || 0) : Number(p.saldo_hutang || 0);
+  }
+  p.aktif = p.aktif === 0 || p.aktif === '0' ? 0 : 1;
+  p.created_at = p.created_at || nowIso_();
+  return saveRow_('Pelanggan', p, ['nama', 'telp', 'alamat', 'saldo_hutang', 'aktif', 'created_at']);
+}
+
+function saveProduk_(p) {
+  if (!p.nama) return fail_('Nama produk wajib');
+  p.harga_beli = num_(p.harga_beli);
+  p.harga_jual = num_(p.harga_jual);
+  p.harga_dingin = num_(p.harga_dingin);
+  p.stok = num_(p.stok);
+  p.stok_min = num_(p.stok_min);
+  p.aktif = p.aktif === 0 || p.aktif === '0' ? 0 : 1;
+  p.satuan = p.satuan || 'pcs';
+  p.updated_at = nowIso_();
+  p.created_at = p.created_at || nowIso_();
+  return saveRow_('Produk', p, HEADERS.Produk.slice(1));
+}
+
+function adjustStok_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const pr = findById_('Produk', p.produk_id || p.id);
+    if (!pr) return fail_('Produk tidak ditemukan');
+    const delta = num_(p.delta || p.qty);
+    const next = roundQty_(num_(pr.stok) + delta);
+    if (next < 0) return fail_('Stok tidak cukup');
+    updateFields_('Produk', pr.id, { stok: next, updated_at: nowIso_() });
+    log_(p.user_id, 'adjust_stok', pr.nama + ' ' + delta);
+    return ok_(Object.assign({}, pr, { stok: next }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===================== PENJUALAN ===================== */
+
+function penjualan_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const items = p.items || [];
+    if (!items.length) return fail_('Keranjang kosong');
+    const metode = String(p.metode || 'tunai').toLowerCase();
+    const pelangganId = p.pelanggan_id || 'P0';
+    if (metode === 'hutang' && (!pelangganId || pelangganId === 'P0')) {
+      return fail_('Pelanggan wajib dipilih untuk transaksi hutang');
+    }
+
+    const jenisMap = indexBy_(rows_('Jenis'), 'id');
+    const produkAll = rows_('Produk');
+    const produkMap = indexBy_(produkAll, 'id');
+
+    let subtotal = 0;
+    const norm = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const pr = produkMap[it.produk_id];
+      if (!pr || Number(pr.aktif) === 0) return fail_('Produk tidak valid: ' + (it.nama_produk || it.produk_id));
+      const jenis = jenisMap[pr.jenis_id] || {};
+      const kode = String(jenis.kode || '').toLowerCase();
+      const isDingin = !!it.is_dingin && kode === 'minuman';
+      let harga = isDingin ? num_(pr.harga_dingin || pr.harga_jual) : num_(pr.harga_jual);
+      let qty = num_(it.qty);
+      let modeBerat = '';
+      let nominal = 0;
+
+      if (kode === 'berat') {
+        modeBerat = String(it.mode_berat || 'berat');
+        if (modeBerat === 'nominal') {
+          nominal = num_(it.nominal);
+          if (nominal <= 0) return fail_('Nominal ' + pr.nama + ' tidak valid');
+          if (harga <= 0) return fail_('Harga ' + pr.nama + ' belum diisi');
+          qty = roundQty_(nominal / harga);
+        } else {
+          qty = convertToBase_(num_(it.qty), it.satuan_input || pr.satuan, pr.satuan);
+          nominal = 0;
+        }
+      }
+      if (qty <= 0) return fail_('Qty ' + pr.nama + ' tidak valid');
+      const line = roundMoney_(kode === 'berat' && modeBerat === 'nominal' ? nominal : qty * harga);
+      if (num_(pr.stok) + 1e-9 < qty) return fail_('Stok ' + pr.nama + ' tidak cukup (sisa ' + pr.stok + ' ' + pr.satuan + ')');
+      subtotal += line;
+      norm.push({
+        produk: pr,
+        qty: qty,
+        satuan: pr.satuan,
+        harga_satuan: harga,
+        is_dingin: isDingin ? 1 : 0,
+        mode_berat: modeBerat,
+        nominal: nominal,
+        subtotal: line,
+        nama_produk: pr.nama
+      });
+    }
+
+    const diskon = num_(p.diskon);
+    const total = roundMoney_(Math.max(0, subtotal - diskon));
+    let bayar = num_(p.bayar);
+    let kembalian = 0;
+    if (metode === 'hutang') {
+      bayar = 0;
+      kembalian = 0;
+    } else if (metode === 'campuran') {
+      if (bayar < 0) return fail_('Nominal bayar tidak valid');
+      if (bayar > total) return fail_('Bayar campuran tidak boleh lebih dari total');
+      kembalian = 0;
+    } else if (metode === 'qris' || metode === 'transfer' || metode === 'debit') {
+      bayar = total;
+      kembalian = 0;
+    } else {
+      if (bayar < total) return fail_('Uang bayar kurang');
+      kembalian = roundMoney_(bayar - total);
+    }
+
+    const id = uid_('PJ');
+    const nomor = nomor_('PJ');
+    const tanggal = p.tanggal || nowIso_();
+    appendObj_('Penjualan', {
+      id: id, nomor: nomor, tanggal: tanggal, pelanggan_id: pelangganId,
+      user_id: p.user_id || '', subtotal: subtotal, diskon: diskon, total: total,
+      bayar: bayar, kembalian: kembalian, metode: metode, status: 'selesai',
+      catatan: p.catatan || ''
+    });
+
+    norm.forEach(function (n) {
+      appendObj_('PenjualanItem', {
+        id: uid_('PI'), penjualan_id: id, produk_id: n.produk.id, nama_produk: n.nama_produk,
+        qty: n.qty, satuan: n.satuan, harga_satuan: n.harga_satuan, is_dingin: n.is_dingin,
+        mode_berat: n.mode_berat, nominal: n.nominal, subtotal: n.subtotal
+      });
+      const sisa = roundQty_(num_(n.produk.stok) - n.qty);
+      updateFields_('Produk', n.produk.id, { stok: sisa, updated_at: nowIso_() });
+      n.produk.stok = sisa;
+    });
+
+    const hutangNominal = metode === 'hutang' ? total : (metode === 'campuran' ? roundMoney_(total - bayar) : 0);
+    if (hutangNominal > 0) {
+      catatHutang_(pelangganId, 'hutang', id, hutangNominal, 'Belanja ' + nomor, p.user_id);
+    }
+
+    log_(p.user_id, 'penjualan', nomor + ' ' + total);
+    return ok_({
+      id: id, nomor: nomor, tanggal: tanggal, subtotal: subtotal, diskon: diskon,
+      total: total, bayar: bayar, kembalian: kembalian, metode: metode,
+      pelanggan_id: pelangganId, items: norm.map(function (n) {
+        return {
+          produk_id: n.produk.id, nama_produk: n.nama_produk, qty: n.qty, satuan: n.satuan,
+          harga_satuan: n.harga_satuan, is_dingin: n.is_dingin, mode_berat: n.mode_berat,
+          nominal: n.nominal, subtotal: n.subtotal
+        };
+      })
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===================== PEMBELIAN ===================== */
+
+function pembelian_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const items = p.items || [];
+    if (!items.length) return fail_('Item pembelian kosong');
+    if (!p.supplier_id) return fail_('Supplier wajib dipilih');
+    let total = 0;
+    const norm = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const pr = findById_('Produk', it.produk_id);
+      if (!pr) return fail_('Produk tidak ditemukan');
+      const qty = num_(it.qty);
+      const hb = num_(it.harga_beli || pr.harga_beli);
+      if (qty <= 0) return fail_('Qty tidak valid');
+      const sub = roundMoney_(qty * hb);
+      total += sub;
+      norm.push({ pr: pr, qty: qty, harga_beli: hb, subtotal: sub });
+    }
+    const id = uid_('PB');
+    const nomor = nomor_('PB');
+    appendObj_('Pembelian', {
+      id: id, nomor: nomor, tanggal: p.tanggal || nowIso_(), supplier_id: p.supplier_id,
+      user_id: p.user_id || '', total: roundMoney_(total), status: 'selesai', catatan: p.catatan || ''
+    });
+    norm.forEach(function (n) {
+      appendObj_('PembelianItem', {
+        id: uid_('BI'), pembelian_id: id, produk_id: n.pr.id, nama_produk: n.pr.nama,
+        qty: n.qty, harga_beli: n.harga_beli, subtotal: n.subtotal
+      });
+      updateFields_('Produk', n.pr.id, {
+        stok: roundQty_(num_(n.pr.stok) + n.qty),
+        harga_beli: n.harga_beli,
+        updated_at: nowIso_()
+      });
+    });
+    log_(p.user_id, 'pembelian', nomor);
+    return ok_({ id: id, nomor: nomor, total: roundMoney_(total) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===================== RETUR ===================== */
+
+function returPenjualan_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const pj = findById_('Penjualan', p.penjualan_id);
+    if (!pj) return fail_('Transaksi penjualan tidak ditemukan');
+    const items = p.items || [];
+    if (!items.length) return fail_('Item retur kosong');
+    const asal = rows_('PenjualanItem').filter(function (x) { return x.penjualan_id === pj.id; });
+    const sudah = rows_('ReturPenjualan').filter(function (r) { return r.penjualan_id === pj.id; });
+    const sudahIds = sudah.map(function (r) { return r.id; });
+    const sudahItem = rows_('ReturPenjualanItem').filter(function (i) { return sudahIds.indexOf(i.retur_id) !== -1; });
+    const returQty = {};
+    sudahItem.forEach(function (i) { returQty[i.produk_id] = num_(returQty[i.produk_id]) + num_(i.qty); });
+
+    let total = 0;
+    const norm = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const line = asal.filter(function (a) { return a.produk_id === it.produk_id; })[0];
+      if (!line) return fail_('Produk tidak ada di transaksi asal');
+      const qty = num_(it.qty);
+      const sisa = num_(line.qty) - num_(returQty[it.produk_id]);
+      if (qty <= 0 || qty > sisa + 1e-9) return fail_('Qty retur ' + line.nama_produk + ' melebihi sisa');
+      const sub = roundMoney_(qty * num_(line.harga_satuan));
+      total += sub;
+      norm.push({ line: line, qty: qty, subtotal: sub });
+    }
+    total = roundMoney_(total);
+    const id = uid_('RJ');
+    const nomor = nomor_('RJ');
+    const metode = String(p.metode_refund || 'tunai');
+    appendObj_('ReturPenjualan', {
+      id: id, nomor: nomor, penjualan_id: pj.id, tanggal: p.tanggal || nowIso_(),
+      user_id: p.user_id || '', total: total, alasan: p.alasan || '', metode_refund: metode
+    });
+    norm.forEach(function (n) {
+      appendObj_('ReturPenjualanItem', {
+        id: uid_('RI'), retur_id: id, produk_id: n.line.produk_id, nama_produk: n.line.nama_produk,
+        qty: n.qty, harga: n.line.harga_satuan, subtotal: n.subtotal
+      });
+      const pr = findById_('Produk', n.line.produk_id);
+      if (pr) updateFields_('Produk', pr.id, { stok: roundQty_(num_(pr.stok) + n.qty), updated_at: nowIso_() });
+    });
+    if (metode === 'potong_hutang' && pj.pelanggan_id && pj.pelanggan_id !== 'P0') {
+      catatHutang_(pj.pelanggan_id, 'cicilan', id, total, 'Potong hutang retur ' + nomor, p.user_id);
+    }
+    log_(p.user_id, 'retur_jual', nomor);
+    return ok_({ id: id, nomor: nomor, total: total });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function returPembelian_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const pb = findById_('Pembelian', p.pembelian_id);
+    if (!pb) return fail_('Pembelian tidak ditemukan');
+    const items = p.items || [];
+    if (!items.length) return fail_('Item retur kosong');
+    const asal = rows_('PembelianItem').filter(function (x) { return x.pembelian_id === pb.id; });
+    let total = 0;
+    const norm = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const line = asal.filter(function (a) { return a.produk_id === it.produk_id; })[0];
+      if (!line) return fail_('Produk tidak ada di pembelian asal');
+      const qty = num_(it.qty);
+      if (qty <= 0 || qty > num_(line.qty) + 1e-9) return fail_('Qty retur tidak valid');
+      const pr = findById_('Produk', it.produk_id);
+      if (pr && num_(pr.stok) + 1e-9 < qty) return fail_('Stok ' + pr.nama + ' tidak cukup untuk diretur');
+      const sub = roundMoney_(qty * num_(line.harga_beli));
+      total += sub;
+      norm.push({ line: line, pr: pr, qty: qty, subtotal: sub });
+    }
+    const id = uid_('RB');
+    const nomor = nomor_('RB');
+    appendObj_('ReturPembelian', {
+      id: id, nomor: nomor, pembelian_id: pb.id, tanggal: p.tanggal || nowIso_(),
+      user_id: p.user_id || '', total: roundMoney_(total), alasan: p.alasan || ''
+    });
+    norm.forEach(function (n) {
+      appendObj_('ReturPembelianItem', {
+        id: uid_('RBI'), retur_id: id, produk_id: n.line.produk_id, nama_produk: n.line.nama_produk,
+        qty: n.qty, harga: n.line.harga_beli, subtotal: n.subtotal
+      });
+      if (n.pr) updateFields_('Produk', n.pr.id, { stok: roundQty_(num_(n.pr.stok) - n.qty), updated_at: nowIso_() });
+    });
+    log_(p.user_id, 'retur_beli', nomor);
+    return ok_({ id: id, nomor: nomor, total: roundMoney_(total) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===================== HUTANG ===================== */
+
+function catatHutang_(pelangganId, jenis, referensi, jumlah, keterangan, userId) {
+  const pl = findById_('Pelanggan', pelangganId);
+  if (!pl) throw new Error('Pelanggan tidak ditemukan');
+  const sebelum = num_(pl.saldo_hutang);
+  const delta = jenis === 'hutang' ? num_(jumlah) : -num_(jumlah);
+  let sesudah = roundMoney_(sebelum + delta);
+  if (sesudah < 0) sesudah = 0;
+  appendObj_('Hutang', {
+    id: uid_('HT'), pelanggan_id: pelangganId, tanggal: nowIso_(), jenis: jenis,
+    referensi: referensi || '', jumlah: num_(jumlah), saldo_sebelum: sebelum,
+    saldo_sesudah: sesudah, keterangan: keterangan || '', user_id: userId || ''
+  });
+  updateFields_('Pelanggan', pelangganId, { saldo_hutang: sesudah });
+  return sesudah;
+}
+
+function ringkasanHutang_() {
+  return rows_('Pelanggan')
+    .filter(function (p) { return Number(p.aktif) === 1 && p.id !== 'P0'; })
+    .map(function (p) {
+      return {
+        id: p.id, nama: p.nama, telp: p.telp, alamat: p.alamat,
+        saldo_hutang: num_(p.saldo_hutang)
+      };
+    })
+    .sort(function (a, b) { return b.saldo_hutang - a.saldo_hutang; });
+}
+
+function detailHutang_(pelangganId) {
+  const pl = findById_('Pelanggan', pelangganId);
+  if (!pl) throw new Error('Pelanggan tidak ditemukan');
+  const hist = rows_('Hutang')
+    .filter(function (h) { return h.pelanggan_id === pelangganId; })
+    .sort(function (a, b) { return String(a.tanggal).localeCompare(String(b.tanggal)); });
+  return { pelanggan: pl, riwayat: hist };
+}
+
+function bayarHutang_(p) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const pl = findById_('Pelanggan', p.pelanggan_id);
+    if (!pl) return fail_('Pelanggan tidak ditemukan');
+    const jumlah = num_(p.jumlah);
+    if (jumlah <= 0) return fail_('Nominal cicilan tidak valid');
+    const saldo = num_(pl.saldo_hutang);
+    if (jumlah > saldo + 0.009) return fail_('Cicilan melebihi sisa hutang Rp ' + saldo);
+    const sisa = catatHutang_(pl.id, 'cicilan', p.referensi || '', jumlah, p.keterangan || 'Cicilan hutang', p.user_id);
+    log_(p.user_id, 'cicilan', pl.nama + ' ' + jumlah);
+    return ok_({ saldo_hutang: sisa, dibayar: jumlah });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===================== LAPORAN ===================== */
+
+function listTrans_(sheetName, p) {
+  let list = rows_(sheetName);
+  const from = p && p.from ? String(p.from) : '';
+  const to = p && p.to ? String(p.to) : '';
+  if (from) list = list.filter(function (r) { return String(r.tanggal).slice(0, 10) >= from; });
+  if (to) list = list.filter(function (r) { return String(r.tanggal).slice(0, 10) <= to; });
+  list.sort(function (a, b) { return String(b.tanggal).localeCompare(String(a.tanggal)); });
+  return list;
+}
+
+function detailTrans_(head, item, fk, id) {
+  const h = findById_(head, id);
+  if (!h) throw new Error('Data tidak ditemukan');
+  const items = rows_(item).filter(function (x) { return x[fk] === id; });
+  return { header: h, items: items };
+}
+
+function laporan_(p) {
+  const jenis = String((p && p.jenis) || 'penjualan');
+  const from = (p && p.from) || '';
+  const to = (p && p.to) || '';
+  const map = {
+    penjualan: 'Penjualan',
+    pembelian: 'Pembelian',
+    retur_penjualan: 'ReturPenjualan',
+    retur_pembelian: 'ReturPembelian'
+  };
+  const sheet = map[jenis];
+  if (!sheet) throw new Error('Jenis laporan tidak dikenal');
+  const list = listTrans_(sheet, { from: from, to: to });
+  const total = list.reduce(function (s, r) { return s + num_(r.total); }, 0);
+  return { jenis: jenis, from: from, to: to, rows: list, total: roundMoney_(total), count: list.length };
+}
+
+function dashboard_() {
+  const today = todayStr_();
+  const pj = rows_('Penjualan').filter(function (r) { return String(r.tanggal).slice(0, 10) === today && r.status !== 'batal'; });
+  const omzet = pj.reduce(function (s, r) { return s + num_(r.total); }, 0);
+  const tunai = pj.filter(function (r) { return r.metode === 'tunai'; }).reduce(function (s, r) { return s + num_(r.total); }, 0);
+  const hutangHari = pj.filter(function (r) { return r.metode === 'hutang' || r.metode === 'campuran'; })
+    .reduce(function (s, r) {
+      if (r.metode === 'hutang') return s + num_(r.total);
+      return s + (num_(r.total) - num_(r.bayar));
+    }, 0);
+  const produk = rows_('Produk').filter(function (p) { return Number(p.aktif) === 1; });
+  const menipis = produk.filter(function (p) { return num_(p.stok) <= num_(p.stok_min); });
+  const totalHutang = rows_('Pelanggan').reduce(function (s, p) { return s + num_(p.saldo_hutang); }, 0);
+  return {
+    tanggal: today,
+    transaksi_hari_ini: pj.length,
+    omzet_hari_ini: roundMoney_(omzet),
+    tunai_hari_ini: roundMoney_(tunai),
+    hutang_hari_ini: roundMoney_(hutangHari),
+    total_produk: produk.length,
+    stok_menipis: menipis.length,
+    total_piutang: roundMoney_(totalHutang),
+    menipis: menipis
+  };
+}
+
+/* ===================== SHEET HELPERS ===================== */
+
+function sheet_(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(name);
+  if (!sh) throw new Error('Sheet tidak ada: ' + name);
+  return sh;
+}
+
+function rows_(name) {
+  const sh = sheet_(name);
+  const last = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (last < 2) return [];
+  const values = sh.getRange(1, 1, last, lastCol).getValues();
+  const headers = values[0].map(function (h) { return String(h).trim(); });
+  const out = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (!row[0]) continue;
+    const o = {};
+    headers.forEach(function (h, idx) { o[h] = row[idx]; });
+    out.push(o);
+  }
+  return out;
+}
+
+function findById_(name, id) {
+  if (!id) return null;
+  const list = rows_(name);
+  for (let i = 0; i < list.length; i++) if (String(list[i].id) === String(id)) return list[i];
+  return null;
+}
+
+function indexBy_(arr, key) {
+  const o = {};
+  arr.forEach(function (x) { o[x[key]] = x; });
+  return o;
+}
+
+function appendObj_(name, obj) {
+  const sh = sheet_(name);
+  const headers = HEADERS[name];
+  const row = headers.map(function (h) { return obj[h] !== undefined && obj[h] !== null ? obj[h] : ''; });
+  sh.appendRow(row);
+}
+
+function saveRow_(name, p, fields) {
+  const headers = HEADERS[name];
+  if (!p.id) {
+    p.id = uid_(name.slice(0, 2).toUpperCase());
+    if (headers.indexOf('aktif') !== -1 && p.aktif === undefined) p.aktif = 1;
+    appendObj_(name, p);
+    return ok_(p);
+  }
+  const sh = sheet_(name);
+  const data = sh.getDataRange().getValues();
+  const hdr = data[0].map(function (h) { return String(h).trim(); });
+  const idCol = hdr.indexOf('id');
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(p.id)) {
+      fields.forEach(function (f) {
+        const c = hdr.indexOf(f);
+        if (c !== -1 && p[f] !== undefined) sh.getRange(i + 1, c + 1).setValue(p[f]);
+      });
+      return ok_(p);
+    }
+  }
+  appendObj_(name, p);
+  return ok_(p);
+}
+
+function updateFields_(name, id, fields) {
+  const sh = sheet_(name);
+  const data = sh.getDataRange().getValues();
+  const hdr = data[0].map(function (h) { return String(h).trim(); });
+  const idCol = hdr.indexOf('id');
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(id)) {
+      Object.keys(fields).forEach(function (f) {
+        const c = hdr.indexOf(f);
+        if (c !== -1) sh.getRange(i + 1, c + 1).setValue(fields[f]);
+      });
+      return;
+    }
+  }
+}
+
+function deleteById_(name, id) {
+  if (!id) return fail_('ID kosong');
+  if (name === 'User' && String(id) === 'U1') return fail_('User admin utama tidak boleh dihapus');
+  if (name === 'Pelanggan' && String(id) === 'P0') return fail_('Pelanggan Umum tidak boleh dihapus');
+  const sh = sheet_(name);
+  const data = sh.getDataRange().getValues();
+  const idCol = 0;
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][idCol]) === String(id)) {
+      sh.deleteRow(i + 1);
+      return ok_({ id: id, deleted: true });
+    }
+  }
+  return fail_('Data tidak ditemukan');
+}
+
+function putMap_(name, map) {
+  const sh = sheet_(name);
+  const last = Math.max(sh.getLastRow(), 1);
+  if (last > 1) sh.getRange(2, 1, last - 1, 2).clearContent();
+  const keys = Object.keys(map);
+  if (!keys.length) return;
+  const rows = keys.map(function (k) { return [k, map[k]]; });
+  sh.getRange(2, 1, rows.length, 2).setValues(rows);
+}
+
+function log_(userId, aksi, detail) {
+  try {
+    appendObj_('Log', { id: uid_('LG'), waktu: nowIso_(), user_id: userId || '', aksi: aksi, detail: String(detail || '') });
+  } catch (e) {}
+}
+
+/* ===================== UTILS ===================== */
+
+function nowIso_() {
+  return Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd'T'HH:mm:ss");
+}
+function todayStr_() {
+  return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+}
+function num_(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(String(v).replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+function roundMoney_(n) { return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
+function roundQty_(n) { return Math.round((Number(n) + Number.EPSILON) * 10000) / 10000; }
+function uid_(prefix) {
+  return prefix + Utilities.formatDate(new Date(), TZ, 'yyyyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+}
+function nomor_(prefix) {
+  const d = Utilities.formatDate(new Date(), TZ, 'yyyyMMdd-HHmmss');
+  return prefix + '-' + d;
+}
+function convertToBase_(qty, fromUnit, baseUnit) {
+  const f = String(fromUnit || baseUnit || '').toLowerCase();
+  const b = String(baseUnit || '').toLowerCase();
+  if (f === b) return qty;
+  if (b === 'kg' && (f === 'gram' || f === 'g' || f === 'gr')) return qty / 1000;
+  if (b === 'gram' && f === 'kg') return qty * 1000;
+  if ((b === 'liter' || b === 'l') && (f === 'ml')) return qty / 1000;
+  if (b === 'ml' && (f === 'liter' || f === 'l')) return qty * 1000;
+  return qty;
+}
+
+/** Menu di Spreadsheet: WarungPOS > Setup Database */
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('WarungPOS')
+    .addItem('1. Setup / Perbaiki Database', 'menuSetup')
+    .addItem('2. Deploy petunjuk', 'menuPetunjuk')
+    .addToUi();
+}
+function menuSetup() {
+  const r = ensureSetup_(false);
+  SpreadsheetApp.getUi().alert('Database siap.\nSpreadsheet: ' + r.nama);
+}
+function menuPetunjuk() {
+  SpreadsheetApp.getUi().alert(
+    '1. Deploy > New deployment > Web app\n' +
+    '2. Execute as: Me\n' +
+    '3. Who has access: Anyone\n' +
+    '4. Salin URL Web App ke frontend Blogger (CONFIG.GAS_URL)'
+  );
+}
