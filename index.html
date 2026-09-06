@@ -715,13 +715,29 @@ html.has-session .boot-splash{display:grid}
     </div>
 
     <div class="view" id="view-printer">
-      <p class="hint">Struk/nota dan laporan punya pengaturan kertas sendiri. Saat dialog cetak muncul, pilih printer fisik yang sesuai (misalnya thermal untuk struk, A4 untuk laporan).</p>
+      <p class="hint">Struk/nota dan laporan bisa printer berbeda. QZ Tray mencetak langsung tanpa dialog browser.</p>
+      <div class="card" style="margin-bottom:12px">
+        <h3 style="margin:0 0 6px">QZ Tray</h3>
+        <p class="hint">1) Pasang <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a> di komputer kasir. 2) Buka aplikasi QZ Tray. 3) Hubungkan, lalu pilih printer. Saat muncul izin, pilih Always allow untuk situs ini.</p>
+        <label class="fld">Cara cetak</label>
+        <select id="prtMode">
+          <option value="browser">Dialog browser</option>
+          <option value="qz">QZ Tray (langsung ke printer)</option>
+        </select>
+        <p id="qzStatus" class="hint">Status: belum terhubung</p>
+        <div class="row-btns" style="margin-top:10px">
+          <button class="btn" type="button" onclick="hubungQz()">Hubungkan QZ Tray</button>
+          <button class="btn-ghost" type="button" onclick="muatPrinterQz()">Muat daftar printer</button>
+        </div>
+      </div>
       <div class="two">
         <div class="card">
           <h3 style="margin:0 0 6px">Printer struk / nota</h3>
           <p class="hint">Kasir setelah bayar, tutup kasir setoran.</p>
-          <label class="fld">Nama printer (petunjuk di dialog cetak)</label>
-          <input id="prtSNama" placeholder="Contoh: Thermal 80mm">
+          <label class="fld">Printer QZ / Windows</label>
+          <select id="prtSQz" onchange="if(this.value)document.getElementById('prtSNama').value=this.value"><option value="">— pilih dari QZ —</option></select>
+          <label class="fld">Nama printer</label>
+          <input id="prtSNama" placeholder="Nama persis di Windows, contoh: EPSON TM-T82">
           <label class="fld">Lebar kertas</label>
           <select id="prtSKertas"><option value="80">80 mm</option><option value="58">58 mm</option></select>
           <div class="two">
@@ -738,8 +754,10 @@ html.has-session .boot-splash{display:grid}
         <div class="card">
           <h3 style="margin:0 0 6px">Printer laporan</h3>
           <p class="hint">Laporan, lembar hitung stok opname, hasil opname.</p>
-          <label class="fld">Nama printer (petunjuk di dialog cetak)</label>
-          <input id="prtLNama" placeholder="Contoh: HP Laser A4">
+          <label class="fld">Printer QZ / Windows</label>
+          <select id="prtLQz" onchange="if(this.value)document.getElementById('prtLNama').value=this.value"><option value="">— pilih dari QZ —</option></select>
+          <label class="fld">Nama printer</label>
+          <input id="prtLNama" placeholder="Nama persis di Windows, contoh: HP LaserJet">
           <label class="fld">Ukuran kertas</label>
           <select id="prtLKertas"><option value="A4">A4</option><option value="A5">A5</option><option value="Letter">Letter</option></select>
           <label class="fld">Orientasi</label>
@@ -811,7 +829,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.14';
+const APP_VERSION = '2026.09.06.15';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2665,22 +2683,15 @@ function printDokumen(kind, html){
   const title=(isStruk?'Struk / nota':'Laporan')+(cfg.nama?(' — '+cfg.nama):'');
   const doc='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">'+
     '<title>'+esc(title)+'</title><style>'+css+'</style></head><body>'+body+'</body><'+'/html>';
-  let w=null;
-  try{ w=window.open('', '_blank'); }catch(e){ w=null; }
-  if(w && w.document){
-    w.document.open(); w.document.write(doc); w.document.close();
-    setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 300);
+  const mode=((STATE.data.pengaturan||{}).prt_mode)||'browser';
+  if(mode==='qz'){
+    printQz(kind, doc).then(function(){ toast('Terkirim ke printer QZ'); }).catch(function(err){
+      toast('QZ Tray: '+(err&&(err.message||err)||'gagal')+' — dialog browser dibuka');
+      printBrowserDoc(doc, isStruk, html);
+    });
     return;
   }
-  const el=document.getElementById('printArea');
-  if(!el) return toast('Izinkan pop-up untuk mencetak');
-  el.classList.remove('app-hidden');
-  el.classList.toggle('print-struk', isStruk);
-  el.innerHTML=html;
-  setTimeout(function(){
-    window.print();
-    setTimeout(function(){ el.classList.add('app-hidden'); el.innerHTML=''; }, 400);
-  }, 80);
+  printBrowserDoc(doc, isStruk, html);
 }
 
 /* ================= STOK ================= */
@@ -3395,9 +3406,146 @@ function pasangUpdate(){
   location.replace(dest);
 }
 
+
+var QZ_SRC='https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js';
+var SHA_SRC='https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/build/sha256.min.js';
+function loadScriptOnce(src){
+  return new Promise(function(ok, fail){
+    const hit=document.querySelector('script[data-wp-src="'+src+'"]');
+    if(hit){ if(hit.getAttribute('data-ok')==='1') return ok(); hit.addEventListener('load', function(){ ok(); }); hit.addEventListener('error', fail); return; }
+    const s=document.createElement('script');
+    s.src=src; s.async=true; s.setAttribute('data-wp-src', src);
+    s.onload=function(){ s.setAttribute('data-ok','1'); ok(); };
+    s.onerror=function(){ fail(new Error('Gagal memuat '+src)); };
+    document.head.appendChild(s);
+  });
+}
+function setQzStatus(msg){
+  const el=document.getElementById('qzStatus');
+  if(!el) return;
+  if(msg){ el.textContent=msg; return; }
+  try{
+    if(window.qz && qz.websocket && qz.websocket.isActive()) el.textContent='Status: terhubung ke QZ Tray';
+    else el.textContent='Status: belum terhubung';
+  }catch(e){ el.textContent='Status: belum terhubung'; }
+}
+function qzAktif(){
+  try{ return !!(window.qz && qz.websocket && qz.websocket.isActive()); }catch(e){ return false; }
+}
+function ensureQzLib(){
+  if(window.qz) return Promise.resolve(window.qz);
+  return loadScriptOnce(SHA_SRC).then(function(){ return loadScriptOnce(QZ_SRC); }).then(function(){
+    if(!window.qz) throw new Error('qz-tray.js tidak termuat');
+    try{
+      if(window.sha256) qz.api.setSha256Type(function(d){ return sha256(d); });
+    }catch(e){}
+    return window.qz;
+  });
+}
+function hubungQz(){
+  setQzStatus('Status: menghubungkan…');
+  ensureQzLib().then(function(){
+    if(qzAktif()) return;
+    return qz.websocket.connect({ retries: 8, delay: 1 });
+  }).then(function(){
+    setQzStatus();
+    toast('QZ Tray terhubung');
+    return muatPrinterQz();
+  }).catch(function(e){
+    setQzStatus('Status: gagal — pasang dan jalankan QZ Tray');
+    toast('QZ Tray belum siap. Pasang dari qz.io/download lalu buka aplikasinya. '+(e&&(e.message||e)||''));
+  });
+}
+function muatPrinterQz(){
+  return ensureQzLib().then(function(){
+    if(!qzAktif()) return qz.websocket.connect({ retries: 5, delay: 1 });
+  }).then(function(){
+    return qz.printers.find();
+  }).then(function(list){
+    const arr=[].concat(list||[]);
+    isiPilihQz('prtSQz', (document.getElementById('prtSNama')||{}).value, arr);
+    isiPilihQz('prtLQz', (document.getElementById('prtLNama')||{}).value, arr);
+    setQzStatus('Status: terhubung · '+arr.length+' printer');
+    if(!arr.length) toast('QZ terhubung, tapi belum ada printer');
+    else toast(arr.length+' printer ditemukan');
+  }).catch(function(e){
+    toast('Tidak bisa memuat printer: '+(e&&(e.message||e)||''));
+  });
+}
+function isiPilihQz(id, cur, list){
+  const el=document.getElementById(id); if(!el) return;
+  const now=cur||'';
+  const names=list.slice();
+  if(now && names.indexOf(now)<0) names.unshift(now);
+  el.innerHTML='<option value="">— pilih dari QZ —</option>'+names.map(function(n){
+    return '<option value="'+esc(n)+'"'+(n===now?' selected':'')+'>'+esc(n)+'</option>';
+  }).join('');
+}
+function printQz(kind, doc){
+  const cfg=printerCfg(kind);
+  const nama=(cfg.nama||'').trim();
+  if(!nama) return Promise.reject(new Error('Pilih nama printer QZ dulu'));
+  const isStruk=kind==='struk';
+  const copies=Math.max(1, Math.min(5, num(cfg.copies)||1));
+  const mm=isStruk?(String(cfg.kertas)==='58'?58:80):0;
+  const inch=function(x){ return Math.round((x/25.4)*1000)/1000; };
+  let widthIn, heightIn, ori;
+  if(isStruk){
+    widthIn=inch(mm); heightIn=null; ori='portrait';
+  } else {
+    ori=cfg.orientasi==='landscape'?'landscape':'portrait';
+    if(cfg.kertas==='A5'){ widthIn=5.83; heightIn=8.27; }
+    else if(cfg.kertas==='Letter'){ widthIn=8.5; heightIn=11; }
+    else { widthIn=8.27; heightIn=11.69; }
+    if(ori==='landscape'){ const tmp=widthIn; widthIn=heightIn; heightIn=tmp; }
+  }
+  const mIn=inch(num(cfg.margin));
+  const opt={
+    copies:copies,
+    jobName:isStruk?'Struk WarungPOS':'Laporan WarungPOS',
+    interpolation:'nearest-neighbor',
+    scaleContent:true,
+    rasterize:true,
+    margins:{ top:mIn, right:mIn, bottom:mIn, left:mIn },
+    orientation:ori,
+    units:'in',
+    size: heightIn?{width:widthIn, height:heightIn}:{width:widthIn}
+  };
+  const data=[{
+    type:'pixel', format:'html', flavor:'plain', data:doc,
+    options:{ pageWidth:widthIn }
+  }];
+  return ensureQzLib().then(function(){
+    if(!qzAktif()) return qz.websocket.connect({ retries: 5, delay: 1 });
+  }).then(function(){
+    return qz.print(qz.configs.create(nama, opt), data);
+  });
+}
+function printBrowserDoc(doc, isStruk, html){
+  let w=null;
+  try{ w=window.open('', '_blank'); }catch(e){ w=null; }
+  if(w && w.document){
+    w.document.open(); w.document.write(doc); w.document.close();
+    setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 300);
+    return;
+  }
+  const el=document.getElementById('printArea');
+  if(!el) return toast('Izinkan pop-up untuk mencetak');
+  el.classList.remove('app-hidden');
+  el.classList.toggle('print-struk', isStruk);
+  el.innerHTML=html;
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){ el.classList.add('app-hidden'); el.innerHTML=''; }, 400);
+  }, 80);
+}
+
 function renderPrinter(){
   const s=printerCfg('struk'), l=printerCfg('laporan');
   const set=function(id,v){ const el=document.getElementById(id); if(el) el.value=v; };
+  const modeEl=document.getElementById('prtMode');
+  if(modeEl) modeEl.value=(STATE.data.pengaturan&&STATE.data.pengaturan.prt_mode)||'browser';
+  setQzStatus();
   set('prtSNama', s.nama||'');
   set('prtSKertas', s.kertas||'80');
   set('prtSFont', s.font||12);
@@ -3413,6 +3561,7 @@ function renderPrinter(){
 }
 function simpanPrinter(quiet){
   persistPengaturan({
+    prt_mode:(document.getElementById('prtMode')||{}).value||'browser',
     prt_struk:{
       nama:(document.getElementById('prtSNama').value||'').trim(),
       kertas:document.getElementById('prtSKertas').value||'80',
@@ -3929,5 +4078,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36bc22cbc6e409a',t:'MTc4ODY3OTcyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36bcedf8bbddf9b',t:'MTc4ODY4MDI0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
