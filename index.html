@@ -658,7 +658,7 @@ html.has-session .boot-splash{display:grid}
     <!-- UPDATE -->
     <div class="view" id="view-update">
       <div class="card">
-        <p class="hint">Pembaruan diambil dari GitHub. Tidak perlu Deploy di Apps Script untuk tampilan kasir.</p>
+        <p class="hint">Pembaruan diambil dari GitHub. Pasang lewat alamat <b>github.io</b>, bukan script.google.com — URL /exec ditambah ?v= bisa jadi halaman putih.</p>
         <div class="dash" id="updKpi"></div>
         <p id="updNotes" class="hint"></p>
         <label class="fld">Repo GitHub</label>
@@ -687,7 +687,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.05.3';
+const APP_VERSION = '2026.09.05.4';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2678,13 +2678,28 @@ async function cekUpdate(quiet){
     return null;
   }
 }
+function githubPagesUrl(){
+  var repo=updateRepo();
+  var parts=String(repo||'').split('/').filter(Boolean);
+  if(parts.length>=2) return 'https://'+parts[0]+'.github.io/'+parts[1].replace(/\.git$/,'')+'/';
+  return 'https://dhonisatyaji-ai.github.io/warungpos/';
+}
+function onExecUrl(){
+  try{ return /script\.google\.com\/macros\//.test(String(location.href||'')); }catch(e){ return false; }
+}
 function pasangUpdate(){
   var repo=updateRepo();
   try{ localStorage.setItem('warungpos_update_repo', repo); localStorage.setItem('warungpos_force_update', String(Date.now())); }catch(e){}
   var msg=document.getElementById('updMsg');
-  if(msg) msg.textContent='Memuat ulang ke versi baru…';
-  var base=location.href.split('#')[0].split('?')[0];
-  location.replace(base+'?v='+Date.now());
+  var dest;
+  if(onExecUrl() || onAppsScript()){
+    dest=githubPagesUrl()+'?v='+Date.now();
+    if(msg) msg.textContent='Membuka versi GitHub…';
+  }else{
+    dest=location.href.split('#')[0].split('?')[0]+'?v='+Date.now();
+    if(msg) msg.textContent='Memuat ulang ke versi baru…';
+  }
+  location.replace(dest);
 }
 function renderPengaturan(){
   const s=STATE.data.pengaturan||{};
@@ -3113,5 +3128,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a365fe378f71c8a7',t:'MTc4ODYxOTI2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a369bbfa195bbff8',t:'MTc4ODY1ODQ5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
