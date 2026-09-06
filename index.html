@@ -515,7 +515,7 @@ html.has-session .boot-splash{display:grid}
       <div id="stokProdukBox">
         <div class="dash" id="stokDash"></div>
         <div class="table-wrap"><table><thead><tr>
-          <th>SKU</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
+          <th>SKU</th><th>Barcode</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
         </tr></thead><tbody id="stokBody"></tbody></table></div>
       </div>
     </div>
@@ -547,7 +547,7 @@ html.has-session .boot-splash{display:grid}
 
     <!-- PEMBELIAN -->
     <div class="view" id="view-beli">
-      <p class="hint">Satu faktur = <b>satu supplier</b>. Pilih pemasok dulu, lalu input barang masuk. Stok bertambah setelah faktur disimpan.</p>
+      <p class="hint">Satu faktur = <b>satu supplier</b>. Pencarian produk hanya milik supplier terpilih. Produk baru: SKU otomatis dari kategori, isi barcode jika ada.</p>
       <div class="sup-pick" id="beliSupPick"></div>
       <div class="card" style="margin-bottom:12px">
         <div class="two">
@@ -556,12 +556,14 @@ html.has-session .boot-splash{display:grid}
         </div>
         <p class="hint" id="beliSupHint">Pilih supplier di kartu atas atau di daftar.</p>
         <div class="toolbar" style="margin-top:10px">
-          <select id="beliProduk" style="max-width:280px" onchange="onBeliProduk()"></select>
+          <input id="beliCari" placeholder="Cari nama / SKU / barcode…" oninput="fillBeliProduk()" onkeydown="if(event.key==='Enter'){event.preventDefault();pilihBeliScan();}" style="max-width:220px">
+          <select id="beliProduk" style="max-width:240px" onchange="onBeliProduk()"></select>
           <input id="beliQty" type="number" placeholder="Qty" style="max-width:100px">
           <input id="beliHarga" type="number" placeholder="Harga beli" style="max-width:140px">
           <button class="btn-sm btn" onclick="addBeliItem()">Tambah item</button>
+          <button class="btn-sm btn-gold" type="button" onclick="openProdukDariBeli()">+ Produk baru</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Produk</th><th>Qty</th><th>Harga beli</th><th>Subtotal</th><th></th></tr></thead><tbody id="beliItems"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Produk</th><th>Barcode</th><th>Qty</th><th>Harga beli</th><th>Subtotal</th><th></th></tr></thead><tbody id="beliItems"></tbody></table></div>
         <div class="row-btns" style="margin-top:10px">
           <b id="beliTotal">Total Rp 0</b>
           <button class="btn right" onclick="simpanPembelian()">Simpan faktur supplier</button>
@@ -875,7 +877,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.25';
+const APP_VERSION = '2026.09.06.26';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1501,7 +1503,16 @@ function localHandle(action, p){
     case 'getProduk': return d.produk;
     case 'saveProduk':{
       ['harga_beli','harga_jual','harga_dingin','stok','stok_min'].forEach(k=>p[k]=num(p[k]));
-      if(p.id){ const o=find(d.produk,p.id); Object.assign(o,p); }
+      p.sku=String(p.sku||'').trim(); p.barcode=String(p.barcode||'').trim(); p.nama=String(p.nama||'').trim();
+      if(!p.nama) throw new Error('Nama produk wajib');
+      if(!p.sku) throw new Error('SKU wajib');
+      const skuHit=(d.produk||[]).find(x=>String(x.sku||'').toLowerCase()===p.sku.toLowerCase() && x.id!==p.id);
+      if(skuHit) throw new Error('SKU sudah dipakai ('+skuHit.nama+')');
+      if(p.barcode){
+        const barHit=(d.produk||[]).find(x=>String(x.barcode||'')===p.barcode && x.id!==p.id);
+        if(barHit) throw new Error('Barcode sudah dipakai ('+barHit.nama+')');
+      }
+      if(p.id){ const o=find(d.produk,p.id); if(!o) throw new Error('Produk tidak ada'); Object.assign(o,p); }
       else { p.id=uid('PR'); p.aktif=1; d.produk.push(p); }
       saveDB(); return p;
     }
@@ -2804,16 +2815,59 @@ function renderStok(){
   }).map(p=>{
     const j=find(STATE.data.jenis,p.jenis_id)||{}; const k=find(STATE.data.kategori,p.kategori_id)||{};
     const low=num(p.stok)<=num(p.stok_min);
-    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
+    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
       '<button class="btn-sm btn-ghost" onclick=\'openProduk('+JSON.stringify(p.id)+')\'>Ubah</button> '+
       '<button class="btn-sm btn-ghost" onclick=\'openAdjust('+JSON.stringify(p.id)+')\'>Stok</button></td></tr>';
-  }).join('')||'<tr><td colspan="8" class="muted">Tidak ada produk</td></tr>';
+  }).join('')||'<tr><td colspan="9" class="muted">Tidak ada produk</td></tr>';
 }
-function openProduk(id){
-  const p=id?find(STATE.data.produk,id):{sku:'',barcode:'',nama:'',kategori_id:STATE.data.kategori[0]&&STATE.data.kategori[0].id,jenis_id:'J1',supplier_id:STATE.data.supplier[0]&&STATE.data.supplier[0].id,satuan:'pcs',harga_beli:0,harga_jual:0,harga_dingin:0,stok:0,stok_min:0};
+function katKode(kat){
+  if(!kat) return 'PRD';
+  if(kat.kode) return String(kat.kode).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4)||'PRD';
+  const n=String(kat.nama||'').toUpperCase().replace(/[^A-Z0-9]+/g,'');
+  const map={MINUMAN:'MNM',SEMBAKO:'SMB',ROKOK:'RKK',SNACK:'SNK',SAYURBUMBU:'SYB'};
+  if(map[n]) return map[n];
+  if(n.length>=3) return n.slice(0,3);
+  return (n+'XXX').slice(0,3);
+}
+function nextSkuForKategori(kid){
+  const pre=katKode(find(STATE.data.kategori, kid));
+  const escPre=pre.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re=new RegExp('^'+escPre+'[-]?(\\d+)$','i');
+  let max=0;
+  (STATE.data.produk||[]).forEach(function(p){
+    const m=String(p.sku||'').trim().match(re);
+    if(m) max=Math.max(max, parseInt(m[1],10)||0);
+  });
+  return pre+'-'+String(max+1).padStart(3,'0');
+}
+function skuUnikAtauNaik(sku, exceptId){
+  sku=String(sku||'').trim();
+  if(!sku) sku=nextSkuForKategori((document.getElementById('fKat')||{}).value);
+  const used=function(s){ return (STATE.data.produk||[]).some(function(p){ return String(p.sku||'').toLowerCase()===s.toLowerCase() && p.id!==exceptId; }); };
+  if(!used(sku)) return sku;
+  const m=sku.match(/^(.*?)(\d+)$/);
+  const pre=m?m[1]:(sku+'-');
+  let n=m?parseInt(m[2],10):0;
+  let next, guard=0;
+  do { n+=1; next=pre+String(n).padStart(3,'0'); guard+=1; } while(used(next) && guard<500);
+  return next;
+}
+function openProdukDariBeli(){
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
+  if(!sid) return toast('Pilih supplier dulu');
+  STATE._produkFromBeli=true;
+  openProduk(null, {supplier_id:sid});
+}
+function openProduk(id, opt){
+  opt=opt||{};
+  const defSup=opt.supplier_id || (STATE.data.supplier[0]&&STATE.data.supplier[0].id);
+  const defKat=STATE.data.kategori[0]&&STATE.data.kategori[0].id;
+  const p=id?find(STATE.data.produk,id):{sku:'',barcode:'',nama:'',kategori_id:defKat,jenis_id:'J1',supplier_id:defSup,satuan:'pcs',harga_beli:0,harga_jual:0,harga_dingin:0,stok:0,stok_min:0};
+  if(!p) return toast('Produk tidak ada');
+  if(!id) p.sku=nextSkuForKategori(p.kategori_id);
   modal('<h3>'+(id?'Ubah produk':'Produk baru')+'</h3>'+
-    '<div class="two"><div><label class="fld">Nama</label><input id="fNama" value="'+esc(p.nama||'')+'"></div><div><label class="fld">SKU</label><input id="fSku" value="'+esc(p.sku||'')+'"></div></div>'+
-    '<div class="two"><div><label class="fld">Barcode</label><input id="fBar" value="'+esc(p.barcode||'')+'"></div><div><label class="fld">Satuan</label><select id="fSat"><option>pcs</option><option>kg</option><option>gram</option><option>liter</option><option>ml</option><option>pack</option><option>dus</option></select></div></div>'+
+    '<div class="two"><div><label class="fld">Nama</label><input id="fNama" value="'+esc(p.nama||'')+'"></div><div><label class="fld">SKU</label><input id="fSku" value="'+esc(p.sku||'')+'" placeholder="Otomatis dari kategori"></div></div>'+
+    '<div class="two"><div><label class="fld">Barcode</label><input id="fBar" value="'+esc(p.barcode||'')+'" placeholder="Opsional, unik"></div><div><label class="fld">Satuan</label><select id="fSat"><option>pcs</option><option>kg</option><option>gram</option><option>liter</option><option>ml</option><option>pack</option><option>dus</option></select></div></div>'+
     '<div class="three"><div><label class="fld">Kategori</label><select id="fKat">'+STATE.data.kategori.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
     '<div><label class="fld">Jenis</label><select id="fJen">'+STATE.data.jenis.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
     '<div><label class="fld">Supplier</label><select id="fSup">'+STATE.data.supplier.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div></div>'+
@@ -2821,16 +2875,42 @@ function openProduk(id){
     '<div><label class="fld">Harga jual / biasa</label><input id="fHj" type="number" value="'+num(p.harga_jual)+'"></div>'+
     '<div><label class="fld">Harga dingin</label><input id="fHd" type="number" value="'+num(p.harga_dingin)+'"></div></div>'+
     '<div class="two"><div><label class="fld">Stok</label><input id="fStok" type="number" step="0.01" value="'+num(p.stok)+'"></div><div><label class="fld">Stok minimum</label><input id="fMin" type="number" step="0.01" value="'+num(p.stok_min)+'"></div></div>'+
-    '<p class="hint">Jenis Minuman: isi harga biasa & dingin. Jenis Berat: harga jual = harga per kg/liter. Satuan pcs untuk barang unit.</p>'+
+    '<p class="hint">SKU otomatis dari kategori dan tidak boleh kembar. Barcode opsional, unik. Jenis Minuman: harga biasa & dingin. Jenis Berat: harga per kg/liter.</p>'+
     '<button class="btn full" style="margin-top:10px" onclick=\'simpanProduk('+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
   setTimeout(()=>{
     document.getElementById('fSat').value=p.satuan||'pcs';
     document.getElementById('fKat').value=p.kategori_id; document.getElementById('fJen').value=p.jenis_id; document.getElementById('fSup').value=p.supplier_id;
+    const sku=document.getElementById('fSku');
+    const kat=document.getElementById('fKat');
+    if(kat) kat.onchange=function(){ if(!id && sku && sku.dataset.lock!=='1') sku.value=nextSkuForKategori(kat.value); };
+    if(sku) sku.addEventListener('input', function(){ sku.dataset.lock='1'; });
   },0);
 }
 async function simpanProduk(id){
-  const payload={id:id||undefined,nama:val('fNama'),sku:val('fSku'),barcode:val('fBar'),satuan:val('fSat'),kategori_id:val('fKat'),jenis_id:val('fJen'),supplier_id:val('fSup'),harga_beli:val('fHb'),harga_jual:val('fHj'),harga_dingin:val('fHd'),stok:val('fStok'),stok_min:val('fMin'),aktif:1};
-  try{ await API('saveProduk',payload); if(useRemote()) STATE.data.produk=await API('getProduk'); closeModal(); renderStok(); renderProdukKasir(); toast('Produk disimpan'); }catch(e){ toast(e.message); }
+  let sku=skuUnikAtauNaik(val('fSku'), id||undefined);
+  const skuEl=document.getElementById('fSku'); if(skuEl && skuEl.value!==sku) skuEl.value=sku;
+  const payload={id:id||undefined,nama:val('fNama'),sku:sku,barcode:val('fBar'),satuan:val('fSat'),kategori_id:val('fKat'),jenis_id:val('fJen'),supplier_id:val('fSup'),harga_beli:val('fHb'),harga_jual:val('fHj'),harga_dingin:val('fHd'),stok:val('fStok'),stok_min:val('fMin'),aktif:1};
+  if(!payload.nama) return toast('Nama produk wajib');
+  if(payload.barcode){
+    const barHit=(STATE.data.produk||[]).find(function(x){ return String(x.barcode||'')===String(payload.barcode) && x.id!==id; });
+    if(barHit) return toast('Barcode sudah dipakai ('+barHit.nama+')');
+  }
+  try{
+    const saved=await API('saveProduk',payload);
+    if(useRemote()) STATE.data.produk=await API('getProduk');
+    const pid=(saved&&saved.id)||payload.id;
+    closeModal();
+    try{ renderStok(); }catch(e){}
+    try{ renderProdukKasir(); }catch(e){}
+    if(STATE._produkFromBeli || STATE.view==='beli'){
+      const cari=document.getElementById('beliCari'); if(cari) cari.value='';
+      fillBeliProduk();
+      const sel=document.getElementById('beliProduk');
+      if(sel && pid){ sel.value=pid; onBeliProduk(); }
+      STATE._produkFromBeli=false;
+    }
+    toast('Produk disimpan · SKU '+sku);
+  }catch(e){ toast(e.message); }
 }
 function openAdjust(id){
   const p=find(STATE.data.produk,id);
@@ -2864,15 +2944,43 @@ function onBeliSupplier(){
 }
 function fillBeliProduk(){
   const sid=(document.getElementById('beliSupplier')||{}).value||'';
-  const aktif=(STATE.data.produk||[]).filter(p=>Number(p.aktif)!==0);
-  const mine=aktif.filter(p=>p.supplier_id===sid);
-  const other=aktif.filter(p=>p.supplier_id!==sid);
-  const opt=function(p){ return '<option value="'+p.id+'">'+esc(p.nama)+' · '+rp(p.harga_beli)+'/'+esc(p.satuan||'pcs')+'</option>'; };
-  let html='';
-  if(mine.length) html+='<optgroup label="Produk supplier ini">'+mine.map(opt).join('')+'</optgroup>';
-  if(other.length) html+='<optgroup label="Produk lain">'+other.map(opt).join('')+'</optgroup>';
+  const q=((document.getElementById('beliCari')||{}).value||'').trim().toLowerCase();
+  const mine=(STATE.data.produk||[]).filter(function(p){
+    if(Number(p.aktif)===0) return false;
+    if(String(p.supplier_id||'')!==String(sid||'')) return false;
+    if(!q) return true;
+    return (p.nama+' '+p.sku+' '+(p.barcode||'')).toLowerCase().indexOf(q)!==-1;
+  });
+  const opt=function(p){ return '<option value="'+p.id+'">'+esc(p.nama)+' · '+(p.sku?esc(p.sku)+' · ':'')+(p.barcode?esc(p.barcode)+' · ':'')+rp(p.harga_beli)+'/'+esc(p.satuan||'pcs')+'</option>'; };
   const sel=document.getElementById('beliProduk');
-  if(sel){ sel.innerHTML=html||'<option value="">Tidak ada produk</option>'; onBeliProduk(); }
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML=mine.map(opt).join('')||'<option value="">Tidak ada produk supplier ini</option>';
+    if(cur && mine.some(function(p){ return p.id===cur; })) sel.value=cur;
+    onBeliProduk();
+  }
+}
+function pilihBeliScan(){
+  const q=((document.getElementById('beliCari')||{}).value||'').trim();
+  if(!q) return;
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
+  const ql=q.toLowerCase();
+  const list=(STATE.data.produk||[]).filter(function(p){ return Number(p.aktif)!==0 && String(p.supplier_id||'')===String(sid||''); });
+  let p=list.find(function(x){ return String(x.barcode||'')===q; }) || list.find(function(x){ return String(x.sku||'').toLowerCase()===ql; });
+  if(!p){
+    const hits=list.filter(function(x){ return (x.nama+' '+x.sku+' '+(x.barcode||'')).toLowerCase().indexOf(ql)>=0; });
+    if(hits.length===1) p=hits[0];
+  }
+  if(!p) return toast('Produk tidak ada di supplier ini');
+  const sel=document.getElementById('beliProduk');
+  if(sel){
+    if(!sel.querySelector('option[value="'+p.id+'"]')){
+      const cari=document.getElementById('beliCari'); if(cari) cari.value='';
+      fillBeliProduk();
+    }
+    sel.value=p.id; onBeliProduk();
+  }
+  const qty=document.getElementById('beliQty'); if(qty) qty.focus();
 }
 function onBeliProduk(){
   const p=find(STATE.data.produk,(document.getElementById('beliProduk')||{}).value);
@@ -2906,9 +3014,11 @@ function renderBeliForm(){
   renderBeliHist();
 }
 function addBeliItem(){
-  if(!(document.getElementById('beliSupplier')||{}).value) return toast('Pilih supplier dulu');
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
+  if(!sid) return toast('Pilih supplier dulu');
   const id=document.getElementById('beliProduk').value, qty=num(document.getElementById('beliQty').value), harga=num(document.getElementById('beliHarga').value);
   const p=find(STATE.data.produk,id); if(!p||qty<=0) return toast('Qty tidak valid');
+  if(String(p.supplier_id||'')!==String(sid)) return toast('Produk bukan milik supplier ini');
   STATE.beli.push({produk_id:id,qty,harga_beli:harga||p.harga_beli}); renderBeliItems();
   document.getElementById('beliQty').value='';
 }
@@ -2916,8 +3026,8 @@ function renderBeliItems(){
   let tot=0;
   const box=document.getElementById('beliItems'); if(!box) return;
   box.innerHTML=STATE.beli.map((it,i)=>{ const p=find(STATE.data.produk,it.produk_id)||{nama:'?'}; const sub=it.qty*it.harga_beli; tot+=sub;
-    return '<tr><td>'+esc(p.nama)+'</td><td>'+it.qty+'</td><td>'+rp(it.harga_beli)+'</td><td>'+rp(sub)+'</td><td><button class="btn-sm btn-ghost" onclick="STATE.beli.splice('+i+',1);renderBeliItems()">✕</button></td></tr>';
-  }).join('')||'<tr><td colspan="5" class="muted">Belum ada item</td></tr>';
+    return '<tr><td>'+esc(p.nama)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+it.qty+'</td><td>'+rp(it.harga_beli)+'</td><td>'+rp(sub)+'</td><td><button class="btn-sm btn-ghost" onclick="STATE.beli.splice('+i+',1);renderBeliItems()">✕</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" class="muted">Belum ada item</td></tr>';
   const t=document.getElementById('beliTotal'); if(t) t.textContent='Total '+rp(tot);
 }
 function renderBeliHist(){
@@ -4632,5 +4742,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3706ebacd8bdf93',t:'MTc4ODcyODczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3708f17bfbedf83',t:'MTc4ODczMDA1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
