@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.23",
+  "version": "2026.09.06.24",
   "tanggal": "2026-09-06",
-  "catatan": "Laporan penjualan: omzet dan laba mengikuti filter tanggal & kasir."
+  "catatan": "Cetak ulang struk hari ini di kasir. Laporan barang laku (gabung produk, tanpa invoice & kasir)."
 }
