@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.19",
+  "version": "2026.09.06.20",
   "tanggal": "2026-09-06",
-  "catatan": "Tombol Update: unduh langsung dari GitHub, satu kali Pasang cukup."
+  "catatan": "Cetak ulang struk di Laporan → Transaksi penjualan (kolom Aksi)."
 }
