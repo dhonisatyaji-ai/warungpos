@@ -102,10 +102,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .draft-bar .btn-sm{flex:1}
 .draft-count{display:inline-block;min-width:16px;background:#c4a35a;color:#1c1917;font-size:10px;font-weight:800;
   border-radius:999px;padding:0 6px;margin-left:4px;line-height:16px;text-align:center}
-.draft-row{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+.draft-row{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
   border-radius:12px;padding:10px 12px;margin:0 0 8px}
 .draft-row b{display:block}
 .draft-row .muted{font-size:12px}
+.draft-main{flex:1;min-width:0;background:transparent;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.modal .btn,.modal .btn-ghost,.modal .draft-main{pointer-events:auto;position:relative;z-index:2}
 .side-user{margin-top:auto;padding:8px 10px;border-radius:12px;background:#0f2a24;font-size:12px;flex:none}
 .side-user .btn-sm{padding:4px 8px;font-size:11px}
 .main{min-width:0;display:flex;flex-direction:column}
@@ -788,7 +790,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.9';
+const APP_VERSION = '2026.09.06.10';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1722,15 +1724,34 @@ function bukaDaftarDraft(){
   if(!arr.length) return toast('Belum ada draft');
   const rows=arr.map(function(d){
     const L=draftLabel(d);
-    return '<div class="draft-row"><div style="flex:1;min-width:0"><b>'+esc(L.nama)+'</b><div class="muted">'+L.jam+' · '+L.n+' item · '+rp(L.total)+'</div></div>'+
-      '<button class="btn btn-sm" type="button" onclick="muatDraft('+JSON.stringify(d.id)+')">Muat</button>'+
-      '<button class="btn-ghost btn-sm" type="button" onclick="hapusDraft('+JSON.stringify(d.id)+')">Hapus</button></div>';
+    const id=esc(d.id);
+    return '<div class="draft-row">'+
+      '<button type="button" class="draft-main" data-draft-load="'+id+'"><b>'+esc(L.nama)+'</b><div class="muted">'+L.jam+' · '+L.n+' item · '+rp(L.total)+'</div></button>'+
+      '<button class="btn btn-sm" type="button" data-draft-load="'+id+'">Muat</button>'+
+      '<button class="btn-ghost btn-sm" type="button" data-draft-del="'+id+'">Hapus</button></div>';
   }).join('');
-  modal('<h3>Draft kasir</h3><p class="hint">Tahan belanjaan jika ada transaksi lain yang lebih dulu selesai. Muat lagi kapan saja.</p>'+rows);
+  modal('<h3>Draft kasir</h3><p class="hint">Ketuk baris atau tombol Muat. Jika keranjang sedang terisi, itu otomatis jadi draft dulu.</p>'+rows);
+  bindDraftModal();
+}
+function bindDraftModal(){
+  const bg=document.getElementById('modalBg'); if(!bg) return;
+  bg.querySelectorAll('[data-draft-load]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      muatDraft(btn.getAttribute('data-draft-load'));
+    });
+  });
+  bg.querySelectorAll('[data-draft-del]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      hapusDraft(btn.getAttribute('data-draft-del'));
+    });
+  });
 }
 function muatDraft(id){
+  id=String(id||'');
   const arr=loadDrafts();
-  const d=arr.find(function(x){ return x.id===id; });
+  const d=arr.find(function(x){ return String(x.id)===id; });
   if(!d) return toast('Draft tidak ditemukan');
   const cur=snapshotCart();
   const rest=arr.filter(function(x){ return x.id!==id; });
@@ -1749,7 +1770,8 @@ function applyDraft(d){
   renderDraftBar();
 }
 function hapusDraft(id){
-  saveDrafts(loadDrafts().filter(function(x){ return x.id!==id; }));
+  id=String(id||'');
+  saveDrafts(loadDrafts().filter(function(x){ return String(x.id)!==id; }));
   renderDraftBar();
   const sisa=loadDrafts();
   if(!sisa.length){ closeModal(); toast('Draft dihapus'); return; }
@@ -3839,5 +3861,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36b889628d6df93',t:'MTc4ODY3NzM2NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36b9597db91df9b',t:'MTc4ODY3Nzg5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
