@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.3",
+  "version": "2026.09.06.4",
   "tanggal": "2026-09-06",
-  "catatan": "Pengaturan toko tersimpan di perangkat dan tidak kembali ke nilai awal saat refresh."
+  "catatan": "Perbaikan cetak lembar hitung stok opname yang sebelumnya kosong."
 }
