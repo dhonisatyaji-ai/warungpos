@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.25",
+  "version": "2026.09.06.26",
   "tanggal": "2026-09-06",
-  "catatan": "Kasir: tombol draft/cetak ulang/kosongkan kotak berwarna. Pilih nota lalu cetak."
+  "catatan": "Pembelian: produk baru, cari per supplier, SKU otomatis kategori, kolom barcode."
 }
