@@ -640,7 +640,7 @@ html.has-session .boot-splash{display:grid}
       </div>
       <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
         <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
-      <div class="table-wrap" id="printAreaWrap"><table><thead><tr id="lapHead"><th>No. invoice</th><th>Produk</th><th>Kasir</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
+      <div class="table-wrap" id="printAreaWrap"><table><thead><tr id="lapHead"><th>No. invoice</th><th>Kasir</th><th>Produk</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
     </div>
 
     <!-- LABA -->
@@ -857,7 +857,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.21';
+const APP_VERSION = '2026.09.06.22';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3237,7 +3237,7 @@ async function renderLaporan(){
   const body=document.getElementById('lapBody');
   if(jenis==='penjualan'){
     try{ await ensureLedger(); }catch(e){}
-    if(head) head.innerHTML='<th>No. invoice</th><th>Produk</th><th>Kasir</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th>';
+    if(head) head.innerHTML='<th>No. invoice</th><th>Kasir</th><th>Produk</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th>';
     const itemBy={};
     (STATE.data.penjualanItem||[]).forEach(function(it){
       const k=String(it.penjualan_id||'');
@@ -3266,7 +3266,7 @@ async function renderLaporan(){
         if(!nama){ const p=find(STATE.data.produk,it.produk_id); nama=p?p.nama:'-'; }
         const q=(it.qty===''||it.qty==null)?'-':(String(roundQ(it.qty))+(it.satuan?(' '+it.satuan):''));
         const nom=(it.harga_satuan===''||it.harga_satuan==null)?'-':rp(it.harga_satuan);
-        html.push('<tr><td>'+esc(r.nomor)+'</td><td class="col-produk">'+esc(nama)+'</td><td>'+kasir+'</td><td>'+esc(q)+'</td><td>'+nom+'</td><td>'+rp(it.subtotal)+'</td><td>'+esc(status)+'</td><td class="skip-print col-aksi">'+acts+'</td></tr>');
+        html.push('<tr><td>'+esc(r.nomor)+'</td><td>'+kasir+'</td><td class="col-produk">'+esc(nama)+'</td><td>'+esc(q)+'</td><td>'+nom+'</td><td>'+rp(it.subtotal)+'</td><td>'+esc(status)+'</td><td class="skip-print col-aksi">'+acts+'</td></tr>');
       });
     });
     body.innerHTML=html.join('')||'<tr><td colspan="8" class="muted">Tidak ada data</td></tr>';
@@ -4514,5 +4514,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c30cffd26df8f',t:'MTc4ODY4NDI1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c3f3b0d82df9b',t:'MTc4ODY4NDg0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
