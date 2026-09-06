@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.22",
+  "version": "2026.09.06.23",
   "tanggal": "2026-09-06",
-  "catatan": "Laporan penjualan: kolom Kasir di posisi ke-2."
+  "catatan": "Laporan penjualan: omzet dan laba mengikuti filter tanggal & kasir."
 }
