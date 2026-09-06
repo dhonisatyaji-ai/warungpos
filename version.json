@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.20",
+  "version": "2026.09.06.21",
   "tanggal": "2026-09-06",
-  "catatan": "Cetak ulang struk di Laporan → Transaksi penjualan (kolom Aksi)."
+  "catatan": "Laporan penjualan: no. invoice, produk, kasir, qty, nominal, total, status."
 }
