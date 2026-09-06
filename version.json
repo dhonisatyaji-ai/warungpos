@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.5",
+  "version": "2026.09.06.6",
   "tanggal": "2026-09-06",
-  "catatan": "Perbaikan splash macet (file terpotong) dan cetak lembar hitung."
+  "catatan": "Tutup kasir: rincian modal besok diisi nominal rupiah, bukan jumlah lembar."
 }
