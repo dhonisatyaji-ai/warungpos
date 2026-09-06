@@ -231,8 +231,10 @@ tr:hover td{background:#fff7ed}
 .kembali-box.kurang{background:#fef2f2;border-color:#fecaca}
 .kembali-box.kurang span,.kembali-box.kurang b{color:#b91c1c}
 .struk{width:280px;margin:0 auto;font:12px/1.4 ui-monospace,Menlo,monospace;background:#fff;padding:12px;color:#000}
-.struk .sr{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.struk .sr > :last-child{text-align:right;white-space:nowrap;flex:none}
+.struk .sr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.struk .nom{display:grid;grid-template-columns:1.7em 8em;column-gap:4px;flex:none;font-weight:inherit}
+.struk .nom .rp{text-align:left}
+.struk .nom .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
 .danger-txt{color:var(--danger);font-weight:700}
 .ok-txt{color:var(--ok);font-weight:700}
@@ -809,7 +811,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.13';
+const APP_VERSION = '2026.09.06.14';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -899,6 +901,11 @@ function nowIso(){ const d=new Date(); const z=n=>String(n).padStart(2,'0'); ret
 function todayStr(){ return nowIso().slice(0,10); }
 function num(v){ const n=Number(String(v==null?'':v).replace(',','.')); return isNaN(n)?0:n; }
 function rp(n){ n=Math.round(num(n)); return 'Rp '+String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function rpAngka(n){ n=Math.round(num(n)); return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function rpKolom(n, bold){
+  const tag=bold?'b':'span';
+  return '<'+tag+' class="nom"><span class="rp">Rp</span><span class="n">'+rpAngka(n)+'</span></'+tag+'>';
+}
 function roundM(n){ return Math.round((num(n)+Number.EPSILON)*100)/100; }
 function roundQ(n){ return Math.round((num(n)+Number.EPSILON)*10000)/10000; }
 function hash(s){ /* demo hash */ let h=0; s=String(s); for(let i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0; return 'h'+Math.abs(h); }
@@ -2572,30 +2579,30 @@ function buatStrukHtml(res){
     else if(find(STATE.data.produk,it.produk_id) && jenisKode(find(STATE.data.produk,it.produk_id))==='minuman') nm+=' (Biasa)';
     if(it.mode_berat==='nominal') nm+=' · '+fmtQty(it.qty,it.satuan)+' (nom '+rp(it.nominal)+')';
     else if(it.mode_berat) nm+=' · '+fmtQty(it.qty,it.satuan);
-    return '<div class="sr"><span>'+esc(nm)+'<br><small>'+fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'</small></span><span>'+rp(it.subtotal)+'</span></div>';
+    return '<div class="sr"><span>'+esc(nm)+'<br><small>'+fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'</small></span>'+rpKolom(it.subtotal)+'</div>';
   }).join('');
-  const sr=function(a,b,bold){
-    return '<div class="sr"><span>'+a+'</span>'+(bold?'<b>':'<span>')+b+(bold?'</b>':'</span>')+'</div>';
+  const sr=function(a,html){
+    return '<div class="sr"><span>'+a+'</span>'+html+'</div>';
   };
   const met='<div>Metode: '+esc(metodeLabel(res.metode))+'</div>';
   let pay='';
   if(res.metode==='tunai'){
-    pay=met+sr('Bayar', rp(res.bayar))+sr('Kembali', rp(res.kembalian));
+    pay=met+sr('Bayar', rpKolom(res.bayar))+sr('Kembali', rpKolom(res.kembalian));
   } else if(isNonTunai(res.metode)){
-    pay=met+sr('Bayar', rp(res.bayar||res.total));
+    pay=met+sr('Bayar', rpKolom(res.bayar||res.total));
   } else if(res.metode==='hutang'){
-    pay=met+sr('Hutang', rp(res.total));
+    pay=met+sr('Hutang', rpKolom(res.total));
   } else if(res.metode==='campuran'){
-    pay=met+sr('Bayar', rp(res.bayar))+sr('Hutang', rp(roundM(num(res.total)-num(res.bayar))));
+    pay=met+sr('Bayar', rpKolom(res.bayar))+sr('Hutang', rpKolom(roundM(num(res.total)-num(res.bayar))));
   } else {
     pay=met;
   }
   return '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
     '<hr class="dashline">'+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc(STATE.user&&STATE.user.nama||'')+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
     '<hr class="dashline">'+items+
-    '<hr class="dashline">'+sr('Subtotal', rp(res.subtotal))+
-    (num(res.diskon)?sr('Diskon / promo', rp(res.diskon)):'')+
-    sr('Total', rp(res.total), true)+
+    '<hr class="dashline">'+sr('Subtotal', rpKolom(res.subtotal))+
+    (num(res.diskon)?sr('Diskon / promo', rpKolom(res.diskon)):'')+
+    sr('Total', rpKolom(res.total, true))+
     pay+
     '<hr class="dashline"><center>'+esc(set.toko_footer||'Terima kasih')+'</center></div>';
 }
@@ -2640,8 +2647,10 @@ function printDokumen(kind, html){
     'th{background:#f3ece1;text-align:left}'+
     'td.isi-fisik{height:28px;min-width:90px}'+
     '.struk{width:100%;margin:0;font:'+font+'px/1.4 ui-monospace,Menlo,monospace}'+
-    '.struk .sr{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}'+
-    '.struk .sr > :last-child{text-align:right;white-space:nowrap;flex:none}'+
+    '.struk .sr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}'+
+    '.struk .nom{display:grid;grid-template-columns:1.7em 8em;column-gap:4px;flex:none;font-weight:inherit}'+
+    '.struk .nom .rp{text-align:left}'+
+    '.struk .nom .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'+
     'hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}'+
     '.op-ttd{display:flex;justify-content:space-between;gap:12px;margin-top:28px;text-align:center;font-size:12px}'+
     '.op-ttd div{flex:1}.op-ttd .garis{margin-top:48px;border-top:1px solid #111;padding-top:6px}'+
@@ -3920,5 +3929,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36bb547ec21fd02',t:'MTc4ODY3OTE5NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36bc22cbc6e409a',t:'MTc4ODY3OTcyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
