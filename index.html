@@ -176,6 +176,7 @@ th.col-aksi{background:#f6f0e6}
 td.col-aksi{background:var(--card)}
 tr:hover td.col-aksi{background:#fff7ed}
 td.col-aksi .btn{white-space:nowrap}
+#view-laporan td.col-produk{white-space:normal;min-width:140px;max-width:280px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .right{margin-left:auto}
 .pill{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800}
@@ -639,7 +640,7 @@ html.has-session .boot-splash{display:grid}
       </div>
       <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
         <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
-      <div class="table-wrap" id="printAreaWrap"><table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
+      <div class="table-wrap" id="printAreaWrap"><table><thead><tr id="lapHead"><th>No. invoice</th><th>Produk</th><th>Kasir</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
     </div>
 
     <!-- LABA -->
@@ -856,7 +857,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.20';
+const APP_VERSION = '2026.09.06.21';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3232,23 +3233,59 @@ async function renderLaporan(){
   const uid=(lapKasir&&lapKasir.value)||'semua';
   let rows=lap.rows||[];
   if(uid!=='semua') rows=rows.filter(r=>String(r.user_id||'')===String(uid));
+  const head=document.getElementById('lapHead');
+  const body=document.getElementById('lapBody');
+  if(jenis==='penjualan'){
+    try{ await ensureLedger(); }catch(e){}
+    if(head) head.innerHTML='<th>No. invoice</th><th>Produk</th><th>Kasir</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th>';
+    const itemBy={};
+    (STATE.data.penjualanItem||[]).forEach(function(it){
+      const k=String(it.penjualan_id||'');
+      if(!itemBy[k]) itemBy[k]=[];
+      itemBy[k].push(it);
+    });
+    const total=rows.reduce(function(s,r){ return s+num(r.total); },0);
+    document.getElementById('lapCount').textContent=rows.length;
+    document.getElementById('lapTotal').textContent=rp(total);
+    const html=[];
+    rows.forEach(function(r){
+      const u=find(STATE.data.user,r.user_id);
+      const kasir=esc(u?u.nama:(r.user_id||'-'));
+      const st=String(r.status||'');
+      const status=st==='batal'?'Batal':((metodeLabel(r.metode)||'Selesai'));
+      let acts='';
+      if(r.id || r.nomor){
+        const sid=esc(String(r.id||r.nomor));
+        acts+='<button type="button" class="btn btn-sm" data-struk-id="'+sid+'">Cetak ulang</button> ';
+        if(bisaBatalPj(r)) acts+='<button type="button" class="btn-ghost btn-sm" data-batal-id="'+sid+'">Batal</button>';
+      }
+      const items=itemBy[String(r.id)]||[];
+      const list=items.length?items:[{nama_produk:'-',qty:'',satuan:'',harga_satuan:'',subtotal:r.total}];
+      list.forEach(function(it){
+        let nama=it.nama_produk;
+        if(!nama){ const p=find(STATE.data.produk,it.produk_id); nama=p?p.nama:'-'; }
+        const q=(it.qty===''||it.qty==null)?'-':(String(roundQ(it.qty))+(it.satuan?(' '+it.satuan):''));
+        const nom=(it.harga_satuan===''||it.harga_satuan==null)?'-':rp(it.harga_satuan);
+        html.push('<tr><td>'+esc(r.nomor)+'</td><td class="col-produk">'+esc(nama)+'</td><td>'+kasir+'</td><td>'+esc(q)+'</td><td>'+nom+'</td><td>'+rp(it.subtotal)+'</td><td>'+esc(status)+'</td><td class="skip-print col-aksi">'+acts+'</td></tr>');
+      });
+    });
+    body.innerHTML=html.join('')||'<tr><td colspan="8" class="muted">Tidak ada data</td></tr>';
+    bindStrukLaporan();
+    return;
+  }
+  if(head) head.innerHTML='<th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print col-aksi">Aksi</th>';
   const total=rows.reduce((s,r)=>s+num(r.total),0);
   document.getElementById('lapCount').textContent=rows.length;
   document.getElementById('lapTotal').textContent=rp(total);
-  document.getElementById('lapBody').innerHTML=rows.map(r=>{
+  body.innerHTML=rows.map(r=>{
     const u=find(STATE.data.user,r.user_id);
     let acts='';
-    if(jenis==='penjualan' && (r.id || r.nomor)){
-      const sid=esc(String(r.id||r.nomor));
-      acts+='<button type="button" class="btn btn-sm" data-struk-id="'+sid+'">Cetak ulang</button> ';
-      if(bisaBatalPj(r)) acts+='<button type="button" class="btn-ghost btn-sm" data-batal-id="'+sid+'">Batal</button>';
-    }
     const st=String(r.status||'');
     const met=esc((metodeLabel(r.metode)||r.status||r.metode_refund||'')+(st==='batal'?' · Batal':''));
     return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+met+'</td><td>'+rp(r.total)+'</td><td class="skip-print col-aksi">'+acts+'</td></tr>';
   }).join('')||'<tr><td colspan="6" class="muted">Tidak ada data</td></tr>';
-  bindStrukLaporan();
 }
+
 
 function inRangeTgl(tgl, from, to){
   var d=String(tgl||'').slice(0,10);
@@ -4477,5 +4514,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c20669a5adf9f',t:'MTc4ODY4MzU4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c30cffd26df8f',t:'MTc4ODY4NDI1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
