@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.14",
+  "version": "2026.09.06.15",
   "tanggal": "2026-09-06",
-  "catatan": "Struk: kolom Rp lurus dari item sampai Bayar/Kembali."
+  "catatan": "Printer QZ Tray: cetak langsung ke printer struk dan laporan terpisah, fallback dialog browser."
 }
