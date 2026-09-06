@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.17",
+  "version": "2026.09.06.18",
   "tanggal": "2026-09-06",
-  "catatan": "Batal transaksi (stok/hutang dikembalikan). Hak akses kasir. QRIS tampil saat bayar."
+  "catatan": "Diskon persen di kasir. Unduh CSV laporan. Riwayat cicilan di hutang."
 }
