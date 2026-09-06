@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.13",
+  "version": "2026.09.06.14",
   "tanggal": "2026-09-06",
-  "catatan": "Struk: metode Tunai bukan di kolom nominal; Bayar/Kembali tetap lurus."
+  "catatan": "Struk: kolom Rp lurus dari item sampai Bayar/Kembali."
 }
