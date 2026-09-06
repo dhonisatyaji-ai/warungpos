@@ -634,7 +634,7 @@ html.has-session .boot-splash{display:grid}
         </div>
         <div class="dash" style="margin-top:12px" id="tkRingkas"></div>
         <h3 style="margin:14px 0 6px;font-size:16px">Rincian modal besok</h3>
-        <p class="hint">Isi jumlah lembar/keping yang ditinggal di laci untuk besok.</p>
+        <p class="hint">Isi <b>nominal rupiah</b> per pecahan yang ditinggal di laci. Bukan jumlah lembar.</p>
         <div class="pecahan" id="tkPecahan"></div>
         <div class="row-btns" style="margin-top:12px;align-items:center">
           <div>Modal besok <b id="tkModalBesok">Rp 0</b></div>
@@ -700,7 +700,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.5';
+const APP_VERSION = '2026.09.06.6';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3072,12 +3072,12 @@ function pecahanTotal(){
   var s=0;
   PECAHAN.forEach(function(p){
     var el=document.getElementById('tk_'+p.k);
-    s += num(el&&el.value)*p.n;
+    s += num(el&&el.value);
   });
   return roundM(s);
 }
 function bacaPecahan(){
-  var o={};
+  var o={_mode:'rp'};
   PECAHAN.forEach(function(p){
     var el=document.getElementById('tk_'+p.k);
     o[p.k]=num(el&&el.value);
@@ -3086,9 +3086,13 @@ function bacaPecahan(){
 }
 function isiPecahan(rincian){
   rincian=parseRincian(rincian);
+  var mode=String(rincian._mode||'');
   PECAHAN.forEach(function(p){
     var el=document.getElementById('tk_'+p.k);
-    if(el) el.value=num(rincian[p.k]);
+    if(!el) return;
+    var v=num(rincian[p.k]);
+    if(mode!=='rp' && v>0 && v<10000) v=roundM(v*p.n);
+    el.value=v||0;
   });
 }
 function hitungTutup(){
@@ -3100,7 +3104,11 @@ function hitungTutup(){
   PECAHAN.forEach(function(p){
     var el=document.getElementById('tk_'+p.k);
     var sub=document.getElementById('tksub_'+p.k);
-    if(sub) sub.textContent=rp(num(el&&el.value)*p.n);
+    if(sub){
+      var nom=num(el&&el.value);
+      var nlem=p.n?Math.round(nom/p.n):0;
+      sub.textContent=nom? (rp(nom)+(nlem? ' · ±'+nlem+' lbr':'')) : 'Rp 0';
+    }
   });
   var mb=document.getElementById('tkModalBesok'); if(mb) mb.textContent=rp(besok);
   var st=document.getElementById('tkSetoran'); if(st){ st.textContent=rp(setor); st.style.color=setor<0?'var(--danger)':'var(--forest)'; }
@@ -3152,7 +3160,7 @@ async function renderTutupKasir(){
   const box=document.getElementById('tkPecahan');
   box.innerHTML=PECAHAN.map(p=>
     '<div class="cell"><span>'+p.label+'</span>'+
-    '<input id="tk_'+p.k+'" type="number" min="0" step="1" value="0" oninput="hitungTutup()">'+
+    '<input id="tk_'+p.k+'" type="number" min="0" step="1" inputmode="numeric" placeholder="Nominal Rp" value="0" oninput="hitungTutup()">'+
     '<small id="tksub_'+p.k+'">Rp 0</small></div>'
   ).join('');
   isiPecahan(saved&&saved.rincian);
@@ -3220,7 +3228,7 @@ function cetakTutupKasir(){
   const rinci=PECAHAN.map(p=>{
     const q=num((document.getElementById('tk_'+p.k)||{}).value);
     if(!q) return '';
-    return '<div style="display:flex;justify-content:space-between"><span>'+p.label+' × '+q+'</span><span>'+rp(q*p.n)+'</span></div>';
+    return '<div style="display:flex;justify-content:space-between"><span>'+p.label+'</span><span>'+rp(q)+'</span></div>';
   }).join('');
   const kn=find(STATE.data.user, tkKasirId())||STATE.user||{};
   const html='<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>TUTUP KASIR<br>'+esc(tgl)+'<br>Kasir: '+esc(kn.nama||STATE.user&&STATE.user.nama||'')+
@@ -3270,5 +3278,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36a6d952f26ea7e',t:'MTc4ODY2NTc3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36add44cd58df93',t:'MTc4ODY3MDM0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
