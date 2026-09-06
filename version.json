@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.11",
+  "version": "2026.09.06.13",
   "tanggal": "2026-09-06",
-  "catatan": "Kasir: jumlah item di transaksi, tombol Bayar tetap di bawah, produk/keranjang discroll jika banyak."
+  "catatan": "Struk: metode Tunai bukan di kolom nominal; Bayar/Kembali tetap lurus."
 }
