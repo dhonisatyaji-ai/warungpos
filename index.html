@@ -628,7 +628,7 @@ html.has-session .boot-splash{display:grid}
       </div>
       <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
         <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
-      <div class="table-wrap" id="printAreaWrap"><table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th></tr></thead><tbody id="lapBody"></tbody></table></div>
+      <div class="table-wrap" id="printAreaWrap"><table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print"></th></tr></thead><tbody id="lapBody"></tbody></table></div>
     </div>
 
     <!-- LABA -->
@@ -793,7 +793,15 @@ html.has-session .boot-splash{display:grid}
         <label class="fld">URL Apps Script (opsional, lambat)</label>
         <input id="setGasUrl" placeholder="Kosongkan jika pakai GitHub + data lokal/Supabase" autocomplete="off">
         <button class="btn" onclick="simpanPengaturan()">Simpan pengaturan</button>
-        <button class="btn-ghost" onclick="resetDemo()">Hapus data lokal</button>
+        <hr style="border:0;border-top:1px dashed var(--line);margin:16px 0">
+        <h3 style="margin:0 0 6px;font-size:16px">Cadangan data</h3>
+        <p class="hint">Unduh file JSON ke HP/laptop. Pulihkan jika ganti perangkat atau data terhapus. Tidak mengganti aplikasi, hanya data toko.</p>
+        <input id="cadanganFile" type="file" accept="application/json,.json" class="app-hidden" onchange="pulihkanCadangan(this)">
+        <div class="row-btns">
+          <button class="btn" type="button" onclick="unduhCadangan()">Unduh cadangan</button>
+          <button class="btn-ghost" type="button" onclick="document.getElementById('cadanganFile').click()">Pulihkan cadangan</button>
+        </div>
+        <button class="btn-ghost" onclick="resetDemo()" style="margin-top:10px">Hapus data lokal</button>
       </div>
     </div>
 
@@ -829,7 +837,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.15';
+const APP_VERSION = '2026.09.06.16';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1641,7 +1649,7 @@ function localReturBeli(p){
 }
 
 /* ================= UI SHELL ================= */
-const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko & koneksi cloud'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
+const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
 
 function showView(name){
   if(!TITLES[name] || !document.getElementById('view-'+name)) name='kasir';
@@ -2616,7 +2624,7 @@ function buatStrukHtml(res){
     pay=met;
   }
   return '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
-    '<hr class="dashline">'+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc(STATE.user&&STATE.user.nama||'')+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
+    '<hr class="dashline">'+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc((find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'')+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
     '<hr class="dashline">'+items+
     '<hr class="dashline">'+sr('Subtotal', rpKolom(res.subtotal))+
     (num(res.diskon)?sr('Diskon / promo', rpKolom(res.diskon)):'')+
@@ -3151,8 +3159,12 @@ async function renderLaporan(){
   document.getElementById('lapTotal').textContent=rp(total);
   document.getElementById('lapBody').innerHTML=rows.map(r=>{
     const u=find(STATE.data.user,r.user_id);
-    return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+esc(metodeLabel(r.metode)||r.status||r.metode_refund||'')+'</td><td>'+rp(r.total)+'</td></tr>';
-  }).join('')||'<tr><td colspan="5" class="muted">Tidak ada data</td></tr>';
+    const strukTd=(jenis==='penjualan' && r.id)
+      ? '<td class="skip-print"><button type="button" class="btn-sm" data-struk-id="'+esc(String(r.id))+'">Struk</button></td>'
+      : '<td class="skip-print"></td>';
+    return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+esc(metodeLabel(r.metode)||r.status||r.metode_refund||'')+'</td><td>'+rp(r.total)+'</td>'+strukTd+'</tr>';
+  }).join('')||'<tr><td colspan="6" class="muted">Tidak ada data</td></tr>';
+  bindStrukLaporan();
 }
 
 function inRangeTgl(tgl, from, to){
@@ -3601,16 +3613,21 @@ function cetakLaporan(){
   const jenis=document.getElementById('lapJenis');
   const from=(document.getElementById('lapFrom')||{}).value||'';
   const to=(document.getElementById('lapTo')||{}).value||'';
-  const body=(document.getElementById('lapBody')||{}).innerHTML||'';
+  const wrap=document.getElementById('printAreaWrap');
+  const table=wrap&&wrap.querySelector('table');
+  if(!table) return toast('Tidak ada data laporan');
+  const clone=table.cloneNode(true);
+  clone.querySelectorAll('.skip-print').forEach(function(el){ el.parentNode.removeChild(el); });
+  const body=(clone.querySelector('tbody')&&clone.querySelector('tbody').innerHTML)||'';
   if(!body || body.indexOf('Tidak ada data')>=0) return toast('Tidak ada data laporan');
   const judul=(jenis && jenis.options[jenis.selectedIndex])?jenis.options[jenis.selectedIndex].text:'Laporan';
   const kasirEl=document.getElementById('lapKasir');
   const kasir=(kasirEl && kasirEl.options[kasirEl.selectedIndex])?kasirEl.options[kasirEl.selectedIndex].text:'';
+  const head=(clone.querySelector('thead')&&clone.querySelector('thead').innerHTML)||'<tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th></tr>';
   const html='<div><b style="font-size:18px">'+esc(set.toko_nama||'WarungPOS')+'</b><br><span>'+esc(set.toko_alamat||'')+'</span>'+
     '<h2 style="margin:10px 0 6px">'+esc(judul)+'</h2>'+
     '<p style="margin:0 0 10px">Periode '+esc(from)+' s/d '+esc(to)+(kasir?' · '+esc(kasir):'')+'</p>'+
-    '<table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th></tr></thead>'+
-    '<tbody>'+body+'</tbody></table>'+
+    '<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+
     '<p style="margin-top:10px">Jumlah '+(document.getElementById('lapCount')||{}).textContent+' · Total '+(document.getElementById('lapTotal')||{}).textContent+'</p>'+
     '<p style="font-size:11px">Dicetak '+esc(nowIso())+' · '+esc((STATE.user&&STATE.user.nama)||'')+'</p></div>';
   printDokumen('laporan', html);
@@ -3650,6 +3667,101 @@ async function simpanPengaturan(){
     toast('Disimpan di perangkat ini');
   }
 }
+
+function kumpulCadangan(){
+  var pg=null, drafts=[], gas='', sb={url:'',key:''};
+  try{ pg=JSON.parse(localStorage.getItem('warungpos_pengaturan')||'null'); }catch(e){}
+  try{ drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||'[]')||[]; }catch(e){}
+  try{ gas=localStorage.getItem('warungpos_gas_url')||''; }catch(e){}
+  try{ sb.url=localStorage.getItem('warungpos_sb_url')||CONFIG.SB_URL||''; sb.key=localStorage.getItem('warungpos_sb_key')||CONFIG.SB_KEY||''; }catch(e){}
+  return {
+    app:'WarungPOS', kind:'cadangan', version:APP_VERSION, at:nowIso(),
+    data:STATE.data,
+    pengaturan: pg || (STATE.data&&STATE.data.pengaturan) || {},
+    drafts:drafts, gas_url:gas, sb:sb
+  };
+}
+function unduhCadangan(){
+  try{
+    const pack=kumpulCadangan();
+    const blob=new Blob([JSON.stringify(pack)], {type:'application/json'});
+    const a=document.createElement('a');
+    const jam=(jamDraft(Date.now())||'').replace(':','');
+    a.href=URL.createObjectURL(blob);
+    a.download='warungpos-cadangan-'+todayStr().replace(/-/g,'')+'-'+jam+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} }, 1500);
+    toast('Cadangan diunduh');
+  }catch(e){ toast('Gagal mengunduh: '+(e.message||e)); }
+}
+function pulihkanCadangan(input){
+  const f=input&&input.files&&input.files[0];
+  if(input) input.value='';
+  if(!f) return;
+  const reader=new FileReader();
+  reader.onerror=function(){ toast('Tidak bisa membaca file'); };
+  reader.onload=function(){
+    try{
+      const pack=JSON.parse(String(reader.result||''));
+      const data=(pack && pack.data && pack.data.produk)?pack.data:(pack&&pack.produk?pack:null);
+      if(!data || !data.produk) throw new Error('File bukan cadangan WarungPOS');
+      const ket=(pack.at?(' tanggal '+pack.at):'')+(pack.version?(' · v'+pack.version):'');
+      if(!confirm('Pulihkan cadangan'+ket+'?\nData toko di perangkat ini akan diganti. Sesi tetap masuk.')) return;
+      STATE.data=data;
+      if(!STATE.data.kas) STATE.data.kas=[];
+      if(!STATE.data.tutupKasir) STATE.data.tutupKasir=[];
+      if(!STATE.data.opname) STATE.data.opname=[];
+      if(!STATE.data.opnameItem) STATE.data.opnameItem=[];
+      if(!STATE.data.promo) STATE.data.promo=[];
+      saveDB();
+      if(pack.pengaturan) persistPengaturan(pack.pengaturan);
+      else if(data.pengaturan) persistPengaturan(data.pengaturan);
+      try{ if(pack.drafts) localStorage.setItem(DRAFT_KEY, JSON.stringify(pack.drafts)); }catch(e){}
+      try{ if(pack.gas_url) localStorage.setItem('warungpos_gas_url', pack.gas_url); else if(pack.gas_url==='') localStorage.removeItem('warungpos_gas_url'); }catch(e){}
+      if(pack.sb && pack.sb.url && pack.sb.key) applySb(pack.sb.url, pack.sb.key);
+      toast('Cadangan dipulihkan');
+      location.reload();
+    }catch(e){ toast(e.message||'Gagal memulihkan cadangan'); }
+  };
+  reader.readAsText(f);
+}
+function bindStrukLaporan(){
+  document.querySelectorAll('#lapBody [data-struk-id]').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      cetakUlangStruk(btn.getAttribute('data-struk-id'));
+    });
+  });
+}
+async function cetakUlangStruk(id){
+  id=String(id||'');
+  if(!id) return toast('Transaksi tidak ditemukan');
+  try{
+    let header=find(STATE.data.penjualan, id);
+    let items=(STATE.data.penjualanItem||[]).filter(function(x){ return String(x.penjualan_id)===id; });
+    if((!header || !items.length) && (typeof API==='function')){
+      try{
+        const det=await API('getPenjualanDetail', {id:id});
+        if(det){
+          header=header||det.header||(det.nomor?det:null);
+          if((!items || !items.length) && det.items) items=det.items;
+        }
+      }catch(e){}
+    }
+    if(!header) return toast('Transaksi tidak ditemukan');
+    items=(items||[]).map(function(it){
+      if(!it.nama_produk){
+        const p=find(STATE.data.produk, it.produk_id);
+        it=Object.assign({}, it, {nama_produk:p?p.nama:(it.produk_id||'')});
+      }
+      return it;
+    });
+    if(!items.length) return toast('Item struk tidak ditemukan');
+    const res=Object.assign({}, header, {items:items});
+    struk(res);
+  }catch(e){ toast(e.message||e); }
+}
+
 function resetDemo(){ if(confirm('Hapus data lokal di perangkat ini? Sesi tetap masuk.')){ localStorage.removeItem(LS_KEY); STATE.data=seed(); saveDB(); toast('Data lokal dihapus'); location.reload(); } }
 
 /* ================= STOK OPNAME ================= */
@@ -4078,5 +4190,5 @@ STATE.data=loadDB();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36bcedf8bbddf9b',t:'MTc4ODY4MDI0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36be5e029d3df8f',t:'MTc4ODY4MTE4NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
