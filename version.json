@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.9",
+  "version": "2026.09.06.10",
   "tanggal": "2026-09-06",
-  "catatan": "Menu samping: Master/Retur/Keuangan/Sistem jadi dropdown. Kasir: simpan draft jika ada transaksi lain yang lebih dulu selesai."
+  "catatan": "Perbaiki tombol Muat/Hapus draft kasir yang tidak bisa diklik."
 }
