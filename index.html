@@ -822,13 +822,13 @@ html.has-session .boot-splash{display:grid}
     <!-- UPDATE -->
     <div class="view" id="view-update">
       <div class="card">
-        <p class="hint">Pembaruan diambil dari GitHub. Pasang lewat alamat <b>github.io</b>, bukan script.google.com — URL /exec ditambah ?v= bisa jadi halaman putih.</p>
+        <p class="hint">Pembaruan diunduh langsung dari GitHub (bukan cache halaman). Satu kali <b>Pasang</b> cukup. Jangan lewat script.google.com — URL /exec bisa jadi halaman putih.</p>
         <div class="dash" id="updKpi"></div>
         <p id="updNotes" class="hint"></p>
         <label class="fld">Repo GitHub</label>
         <input id="updRepo" placeholder="username/warungpos" autocomplete="off">
         <div class="row-btns" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" type="button" onclick="cekUpdate(false)">Cek pembaruan</button>
+          <button class="btn" type="button" id="updCekBtn" onclick="cekUpdate(false)">Cek pembaruan</button>
           <button class="btn-gold" type="button" id="updPasangBtn" onclick="pasangUpdate()">Pasang sekarang</button>
         </div>
         <p id="updMsg" class="hint" style="margin-top:10px"></p>
@@ -851,7 +851,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.18';
+const APP_VERSION = '2026.09.06.19';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3425,23 +3425,83 @@ function renderUpdate(){
     '<div class="dstat"><span>Repo</span><b style="font-size:13px">'+esc(repo)+'</b></div>';
   cekUpdate(true);
 }
+function b64Utf8(s){
+  s=String(s||'').replace(/\s/g,'');
+  var bin=atob(s);
+  var out=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(out);
+}
+function cmpVer(a,b){
+  var pa=String(a||'').split(/[^\d]+/).filter(Boolean).map(Number);
+  var pb=String(b||'').split(/[^\d]+/).filter(Boolean).map(Number);
+  var n=Math.max(pa.length, pb.length);
+  for(var i=0;i<n;i++){
+    var x=pa[i]||0, y=pb[i]||0;
+    if(x!==y) return x>y?1:-1;
+  }
+  return 0;
+}
+async function fetchNoCache(url, headers, ms){
+  var ctrl=new AbortController();
+  var tmr=setTimeout(function(){ try{ ctrl.abort(); }catch(e){} }, ms||9000);
+  try{
+    return await fetch(url, {cache:'no-store', mode:'cors', signal:ctrl.signal, headers:headers||{}});
+  } finally { clearTimeout(tmr); }
+}
+async function readGithubFile(r, api){
+  var text=await r.text();
+  if(api && text.charAt(0)==='{'){
+    try{
+      var meta=JSON.parse(text);
+      if(meta && typeof meta.content==='string' && meta.encoding==='base64') return b64Utf8(meta.content);
+    }catch(e){}
+  }
+  return text;
+}
 async function fetchVersionJson(repo){
   var t=Date.now();
   var urls=[
-    {u:'https://api.github.com/repos/'+repo+'/contents/version.json?ref=main&_'+t, raw:true},
-    {u:'https://raw.githubusercontent.com/'+repo+'/main/version.json?t='+t},
-    {u:'https://cdn.jsdelivr.net/gh/'+repo+'@main/version.json?t='+t}
+    {u:'https://api.github.com/repos/'+repo+'/contents/version.json?ref=main&_='+t, api:1},
+    {u:'https://raw.githubusercontent.com/'+repo+'/main/version.json?t='+t}
   ];
   var last=new Error('Tidak bisa cek pembaruan');
   for(var i=0;i<urls.length;i++){
     try{
-      var opt={cache:'no-store'};
-      if(urls[i].raw) opt.headers={'Accept':'application/vnd.github.raw+json'};
-      var r=await fetch(urls[i].u, opt);
+      var headers=urls[i].api?{'Accept':'application/vnd.github.raw+json'}:{};
+      var r=await fetchNoCache(urls[i].u, headers, 8000);
       if(!r.ok) throw new Error('HTTP '+r.status);
-      var j=await r.json();
+      var text=await readGithubFile(r, urls[i].api);
+      var j=JSON.parse(text);
       if(j && j.version) return j;
       throw new Error('version.json tidak valid');
+    }catch(e){ last=e; }
+  }
+  throw last;
+}
+function looksLikeAppHtml(html){
+  html=String(html||'');
+  return html.length>20000 && html.indexOf('APP_VERSION')>=0 && html.indexOf('(function boot()')>=0;
+}
+function htmlAppVersion(html){
+  var m=String(html||'').match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  return m?m[1]:'';
+}
+async function fetchLatestIndexHtml(repo){
+  var t=Date.now();
+  var urls=[
+    {u:'https://api.github.com/repos/'+repo+'/contents/index.html?ref=main&_='+t, api:1},
+    {u:'https://raw.githubusercontent.com/'+repo+'/main/index.html?t='+t}
+  ];
+  var last=new Error('Tidak bisa unduh index.html');
+  for(var i=0;i<urls.length;i++){
+    try{
+      var headers=urls[i].api?{'Accept':'application/vnd.github.raw+json'}:{};
+      var r=await fetchNoCache(urls[i].u, headers, 20000);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      var html=await readGithubFile(r, urls[i].api);
+      if(!looksLikeAppHtml(html)) throw new Error('File bukan aplikasi kasir');
+      return html;
     }catch(e){ last=e; }
   }
   throw last;
@@ -3450,13 +3510,15 @@ async function cekUpdate(quiet){
   var msg=document.getElementById('updMsg');
   var notes=document.getElementById('updNotes');
   var dot=document.getElementById('updDot');
+  var cek=document.getElementById('updCekBtn');
   var repo=updateRepo();
   try{ localStorage.setItem('warungpos_update_repo', repo); }catch(e){}
+  if(cek) cek.disabled=true;
   if(msg && !quiet) msg.textContent='Mengecek GitHub…';
   try{
     var info=await fetchVersionJson(repo);
     window._updRemote=info;
-    var newer=String(info.version||'')>String(APP_VERSION);
+    var newer=cmpVer(info.version, APP_VERSION)>0;
     if(dot) dot.classList.toggle('app-hidden', !newer);
     if(notes) notes.textContent=info.catatan?('Catatan: '+info.catatan):'';
     var kpi=document.getElementById('updKpi');
@@ -3464,11 +3526,15 @@ async function cekUpdate(quiet){
       '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
       '<div class="dstat"><span>Versi GitHub</span><b class="'+(newer?'ok-txt':'')+'">'+esc(info.version)+'</b></div>'+
       '<div class="dstat"><span>Status</span><b class="'+(newer?'ok-txt':'')+'">'+(newer?'Ada pembaruan':'Sudah yang terbaru')+'</b></div>';
-    if(msg) msg.textContent=newer?('Versi baru '+info.version+' siap dipasang.'):(quiet?'':'Aplikasi sudah versi terbaru.');
+    var pas=document.getElementById('updPasangBtn');
+    if(pas && !window._updLock) pas.textContent=newer?('Pasang '+info.version):'Pasang ulang';
+    if(msg) msg.textContent=newer?('Versi baru '+info.version+' siap. Satu kali Pasang cukup.'):(quiet?'':'Aplikasi sudah versi terbaru.');
     return info;
   }catch(e){
-    if(msg && !quiet) msg.textContent='Gagal cek: '+(e.message||e)+'. Pastikan file version.json ada di root repo.';
+    if(msg && !quiet) msg.textContent='Gagal cek: '+(e.message||e)+'. Ketuk Cek lagi.';
     return null;
+  }finally{
+    if(cek) cek.disabled=false;
   }
 }
 function githubPagesUrl(){
@@ -3480,19 +3546,47 @@ function githubPagesUrl(){
 function onExecUrl(){
   try{ return /script\.google\.com\/macros\//.test(String(location.href||'')); }catch(e){ return false; }
 }
-function pasangUpdate(){
+function applyHtmlUpdate(html){
+  document.open('text/html');
+  document.write(html);
+  document.close();
+}
+async function pasangUpdate(){
+  if(window._updLock) return;
+  window._updLock=true;
+  var msg=document.getElementById('updMsg');
+  var btn=document.getElementById('updPasangBtn');
+  var cek=document.getElementById('updCekBtn');
+  function unlock(){
+    window._updLock=false;
+    if(btn){ btn.disabled=false; btn.textContent='Pasang sekarang'; }
+    if(cek) cek.disabled=false;
+  }
+  if(btn){ btn.disabled=true; btn.textContent='Memasang…'; }
+  if(cek) cek.disabled=true;
   var repo=updateRepo();
   try{ localStorage.setItem('warungpos_update_repo', repo); localStorage.setItem('warungpos_force_update', String(Date.now())); }catch(e){}
-  var msg=document.getElementById('updMsg');
-  var dest;
   if(onExecUrl() || onAppsScript()){
-    dest=githubPagesUrl()+'?v='+Date.now();
-    if(msg) msg.textContent='Membuka versi GitHub…';
-  }else{
-    dest=location.href.split('#')[0].split('?')[0]+'?v='+Date.now();
-    if(msg) msg.textContent='Memuat ulang ke versi baru…';
+    if(msg) msg.textContent='Membuka GitHub Pages…';
+    location.replace(githubPagesUrl()+'index.html?v='+Date.now());
+    return;
   }
-  location.replace(dest);
+  if(msg) msg.textContent='Mengunduh dari GitHub…';
+  try{
+    var html=await fetchLatestIndexHtml(repo);
+    var ver=htmlAppVersion(html)||'baru';
+    if(msg) msg.textContent='Memasang versi '+ver+'…';
+    await new Promise(function(r){ setTimeout(r, 40); });
+    applyHtmlUpdate(html);
+  }catch(e){
+    if(msg) msg.textContent='Gagal unduh: '+(e.message||e)+'. Mencoba muat ulang…';
+    try{
+      location.replace(githubPagesUrl()+'index.html?v='+Date.now());
+    }catch(e2){
+      if(msg) msg.textContent='Gagal pasang: '+(e.message||e)+'. Ketuk Pasang sekali lagi.';
+      unlock();
+    }
+  }
 }
 
 
@@ -4368,7 +4462,12 @@ STATE.data=loadDB();
   } catch(e) {}
   armSplashEscape();
   restoreSession();
+  try{
+    if(location.search && /(?:^|[?&])v=/.test(location.search) && history.replaceState){
+      history.replaceState(null, '', location.pathname+(location.hash||''));
+    }
+  }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c07cadc1ddf9b',t:'MTc4ODY4MjU3NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c15d14f3cdf8b',t:'MTc4ODY4MzE0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
