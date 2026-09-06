@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.18",
+  "version": "2026.09.06.19",
   "tanggal": "2026-09-06",
-  "catatan": "Diskon persen di kasir. Unduh CSV laporan. Riwayat cicilan di hutang."
+  "catatan": "Tombol Update: unduh langsung dari GitHub, satu kali Pasang cukup."
 }
