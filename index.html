@@ -638,8 +638,11 @@ html.has-session .boot-splash{display:grid}
         <button class="btn-ghost" type="button" onclick="cetakLaporan()">Cetak laporan</button>
         <button class="btn-ghost" type="button" onclick="unduhLaporanCsv()">Unduh CSV</button>
       </div>
-      <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
-        <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
+      <div class="dash" id="lapDash">
+        <div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
+        <div class="dstat"><span id="lapTotalLbl">Omzet</span><b id="lapTotal">Rp 0</b></div>
+        <div class="dstat admin-only" id="lapLabaBox"><span>Laba</span><b id="lapLaba">Rp 0</b></div>
+      </div>
       <div class="table-wrap" id="printAreaWrap"><table><thead><tr id="lapHead"><th>No. invoice</th><th>Kasir</th><th>Produk</th><th>Qty</th><th>Nominal</th><th>Total</th><th>Status</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
     </div>
 
@@ -857,7 +860,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.22';
+const APP_VERSION = '2026.09.06.23';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3244,9 +3247,23 @@ async function renderLaporan(){
       if(!itemBy[k]) itemBy[k]=[];
       itemBy[k].push(it);
     });
-    const total=rows.reduce(function(s,r){ return s+num(r.total); },0);
+    const aktif=rows.filter(function(r){ return String(r.status||'')!=='batal'; });
+    const omzet=aktif.reduce(function(s,r){ return s+num(r.total); },0);
+    const idOk={}; aktif.forEach(function(r){ if(r.id) idOk[String(r.id)]=1; });
+    let hpp=0;
+    (STATE.data.penjualanItem||[]).forEach(function(it){
+      if(!idOk[String(it.penjualan_id)]) return;
+      const pr=find(STATE.data.produk, it.produk_id)||{};
+      hpp+=num(it.qty)*num(pr.harga_beli);
+    });
+    const laba=roundM(omzet-hpp);
     document.getElementById('lapCount').textContent=rows.length;
-    document.getElementById('lapTotal').textContent=rp(total);
+    const lbl=document.getElementById('lapTotalLbl'); if(lbl) lbl.textContent='Omzet';
+    document.getElementById('lapTotal').textContent=rp(omzet);
+    const labaEl=document.getElementById('lapLaba');
+    if(labaEl){ labaEl.textContent=rp(laba); labaEl.className=laba>=0?'ok-txt':'danger-txt'; }
+    const labaBox=document.getElementById('lapLabaBox');
+    if(labaBox) labaBox.classList.remove('app-hidden');
     const html=[];
     rows.forEach(function(r){
       const u=find(STATE.data.user,r.user_id);
@@ -3276,7 +3293,10 @@ async function renderLaporan(){
   if(head) head.innerHTML='<th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print col-aksi">Aksi</th>';
   const total=rows.reduce((s,r)=>s+num(r.total),0);
   document.getElementById('lapCount').textContent=rows.length;
+  const lbl2=document.getElementById('lapTotalLbl'); if(lbl2) lbl2.textContent='Total';
   document.getElementById('lapTotal').textContent=rp(total);
+  const labaBox2=document.getElementById('lapLabaBox');
+  if(labaBox2) labaBox2.classList.add('app-hidden');
   body.innerHTML=rows.map(r=>{
     const u=find(STATE.data.user,r.user_id);
     let acts='';
@@ -3872,7 +3892,7 @@ function cetakLaporan(){
     '<h2 style="margin:10px 0 6px">'+esc(judul)+'</h2>'+
     '<p style="margin:0 0 10px">Periode '+esc(from)+' s/d '+esc(to)+(kasir?' · '+esc(kasir):'')+'</p>'+
     '<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+
-    '<p style="margin-top:10px">Jumlah '+(document.getElementById('lapCount')||{}).textContent+' · Total '+(document.getElementById('lapTotal')||{}).textContent+'</p>'+
+    '<p style="margin-top:10px">Jumlah '+(document.getElementById('lapCount')||{}).textContent+' · '+(document.getElementById('lapTotalLbl')||{}).textContent+' '+(document.getElementById('lapTotal')||{}).textContent+((STATE.user&&STATE.user.role==='admin'&&document.getElementById('lapJenis')&&document.getElementById('lapJenis').value==='penjualan'&&document.getElementById('lapLaba'))?(' · Laba '+(document.getElementById('lapLaba').textContent||'')):'')+'</p>'+
     '<p style="font-size:11px">Dicetak '+esc(nowIso())+' · '+esc((STATE.user&&STATE.user.nama)||'')+'</p></div>';
   printDokumen('laporan', html);
 }
@@ -4514,5 +4534,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c3f3b0d82df9b',t:'MTc4ODY4NDg0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c4e313845df8b',t:'MTc4ODY4NTQ1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
