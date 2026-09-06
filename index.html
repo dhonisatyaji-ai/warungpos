@@ -101,6 +101,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .nav-fold.open{display:block}
 .draft-bar{display:flex;gap:6px;margin:0 0 10px}
 .draft-bar .btn-sm{flex:1}
+.cart-acts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px}
+.cart-acts button{border:0;border-radius:10px;padding:10px 8px;min-height:42px;font-weight:800;font-size:12px;line-height:1.2;color:#fff}
+.cart-acts .act-save{background:var(--forest)}
+.cart-acts .act-draft{background:var(--sky)}
+.cart-acts .act-reprint{background:#0f766e}
+.cart-acts .act-clear{background:var(--warn)}
+.cart-acts .draft-count{background:#fff;color:var(--sky)}
+.nota-pick{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px;margin:0 0 8px;cursor:pointer}
+.nota-pick:has(input:checked){border-color:var(--forest);background:#ecfdf5}
+.nota-pick input{margin-top:3px;accent-color:var(--forest);flex:none}
+.nota-pick b{display:block}
+.nota-pick .muted{font-size:12px}
 .draft-count{display:inline-block;min-width:16px;background:#c4a35a;color:#1c1917;font-size:10px;font-weight:800;
   border-radius:999px;padding:0 6px;margin-left:4px;line-height:16px;text-align:center}
 .draft-row{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
@@ -457,11 +470,12 @@ html.has-session .boot-splash{display:grid}
         <aside class="cart" id="cartPanel">
           <div class="cart-head">
           <h3>Keranjang <span id="cartItemN" class="cart-n">0 item</span></h3>
-          <div class="draft-bar">
-            <button class="btn-ghost btn-sm" type="button" onclick="simpanDraft()">Simpan draft</button>
-            <button class="btn-ghost btn-sm" type="button" id="btnDraftList" onclick="bukaDaftarDraft()">Draft <span id="draftCount" class="draft-count app-hidden">0</span></button>
+          <div class="cart-acts">
+            <button type="button" class="act-save" onclick="simpanDraft()">Simpan draft</button>
+            <button type="button" class="act-draft" id="btnDraftList" onclick="bukaDaftarDraft()">Draft <span id="draftCount" class="draft-count app-hidden">0</span></button>
+            <button type="button" class="act-reprint" id="btnCetakUlangHari" onclick="bukaCetakUlangHariIni()">Cetak ulang</button>
+            <button type="button" class="act-clear" onclick="clearCart()">Kosongkan</button>
           </div>
-          <button class="btn-ghost btn-sm" type="button" id="btnCetakUlangHari" onclick="bukaCetakUlangHariIni()" style="width:100%;margin:0 0 10px">Cetak ulang hari ini</button>
           <label class="fld">Pelanggan</label>
           <div class="pel-row">
             <select id="pelangganKasir"><option value="P0" selected>Umum</option></select>
@@ -484,7 +498,6 @@ html.has-session .boot-splash{display:grid}
           <label class="fld">Catatan</label>
           <input id="catatanKasir" placeholder="Opsional">
           <div class="row-btns" style="margin-top:10px">
-            <button class="btn-ghost btn-sm" onclick="clearCart()">Kosongkan</button>
             <button class="btn btn-gold full" id="btnBayarKasir" onclick="openBayar()">Bayar (F8)</button>
           </div>
           </div>
@@ -862,7 +875,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.24';
+const APP_VERSION = '2026.09.06.25';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -4150,23 +4163,40 @@ function transaksiHariIni(){
   list.sort(function(a,b){ return String(b.tanggal||'').localeCompare(String(a.tanggal||'')); });
   return list;
 }
+function ringkasItemPj(id){
+  const items=(STATE.data.penjualanItem||[]).filter(function(x){ return String(x.penjualan_id)===String(id); });
+  if(!items.length) return '';
+  const names=items.map(function(it){ return it.nama_produk||''; }).filter(Boolean);
+  if(!names.length) return '';
+  if(names.length<=2) return names.join(', ');
+  return names.slice(0,2).join(', ')+' +'+(names.length-2);
+}
 function bukaCetakUlangHariIni(){
   const list=transaksiHariIni();
   if(!list.length) return toast('Belum ada transaksi hari ini');
-  const rows=list.map(function(p){
+  let first='';
+  const rows=list.map(function(p,i){
     const st=String(p.status||'');
     const met=st==='batal'?'Batal':(metodeLabel(p.metode)||'Selesai');
     const jam=esc(String(p.tanggal||'').slice(11,16));
-    return '<div class="draft-row"><div class="draft-main"><b>'+esc(p.nomor)+'</b><span class="muted">'+(jam?jam+' · ':'')+esc(met)+' · '+rp(p.total)+'</span></div>'+
-      '<button type="button" class="btn btn-sm" data-struk-id="'+esc(String(p.id||p.nomor))+'">Cetak ulang</button></div>';
+    const id=String(p.id||p.nomor||'');
+    if(!first && st!=='batal') first=id;
+    if(!first && i===0) first=id;
+    const ring=ringkasItemPj(p.id);
+    const chk=id===first?' checked':'';
+    return '<label class="nota-pick"><input type="radio" name="notaPick" value="'+esc(id)+'"'+chk+'>'+
+      '<span><b>'+esc(p.nomor)+'</b><span class="muted">'+(jam?jam+' · ':'')+esc(met)+' · '+rp(p.total)+
+      (ring?('<br>'+esc(ring)):'')+'</span></span></label>';
   }).join('');
-  modal('<h3>Transaksi hari ini</h3><p class="hint">Pilih struk yang mau dicetak ulang.</p>'+rows);
-  document.querySelectorAll('#modalBg [data-struk-id]').forEach(function(btn){
-    btn.addEventListener('click', function(e){
-      e.preventDefault(); e.stopPropagation();
-      cetakUlangStruk(btn.getAttribute('data-struk-id'));
-    });
-  });
+  modal('<h3>Cetak ulang</h3><p class="hint">Pilih nota hari ini, lalu ketuk Cetak.</p>'+rows+
+    '<button type="button" class="btn btn-gold full" id="btnCetakNotaPilih">Cetak</button>');
+  const go=document.getElementById('btnCetakNotaPilih');
+  if(go) go.addEventListener('click', function(e){ e.preventDefault(); cetakNotaTerpilih(); });
+}
+function cetakNotaTerpilih(){
+  const el=document.querySelector('#modalBg input[name="notaPick"]:checked');
+  if(!el || !el.value) return toast('Pilih nota dulu');
+  cetakUlangStruk(el.value);
 }
 
 function resetDemo(){ if(confirm('Hapus data lokal di perangkat ini? Sesi tetap masuk.')){ localStorage.removeItem(LS_KEY); STATE.data=seed(); saveDB(); toast('Data lokal dihapus'); location.reload(); } }
@@ -4602,5 +4632,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37048ad4e02df78',t:'MTc4ODcyNzE3NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3706ebacd8bdf93',t:'MTc4ODcyODczMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
