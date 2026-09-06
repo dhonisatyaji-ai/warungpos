@@ -9,7 +9,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script>try{if(localStorage.getItem('warungpos_session'))document.documentElement.classList.add('has-session')}catch(e){}</script>
+<script>
+(function(){
+  try{ if(localStorage.getItem('warungpos_session')) document.documentElement.classList.add('has-session'); }catch(e){}
+  setTimeout(function(){
+    var el=document.getElementById('bootSplash');
+    if(!el || el.classList.contains('hide')) return;
+    el.classList.add('hide');
+    document.documentElement.classList.remove('has-session');
+    var login=document.getElementById('login'); if(login) login.classList.remove('app-hidden');
+  }, 2500);
+})();
+</script>
 <style>
 :root{
   --ink:#1c1917;--muted:#78716c;--paper:#f3ece1;--card:#fffaf3;--line:#e4d5c3;
@@ -689,7 +700,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.4';
+const APP_VERSION = '2026.09.06.5';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2188,4 +2199,1076 @@ function printHtml(html, wide){
     '.op-ttd div{flex:1}.op-ttd .garis{margin-top:48px;border-top:1px solid #111;padding-top:6px}'+
     '@page{margin:10mm}@media print{body{padding:0}}';
   const doc='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width">'+
-    '<title>Cetak</title><style>'+css+'</style></head><body>'+html+'</body></html>
+    '<title>Cetak</title><style>'+css+'</style></head><body>'+html+'</body><'+'/html>';
+  let w=null;
+  try{ w=window.open('', '_blank'); }catch(e){ w=null; }
+  if(w && w.document){
+    w.document.open(); w.document.write(doc); w.document.close();
+    setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 300);
+    return;
+  }
+  const el=document.getElementById('printArea');
+  if(!el) return toast('Izinkan pop-up untuk mencetak');
+  el.classList.remove('app-hidden');
+  el.classList.toggle('print-struk', !wide);
+  el.innerHTML=html;
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){ el.classList.add('app-hidden'); el.innerHTML=''; }, 400);
+  }, 80);
+}
+
+/* ================= STOK ================= */
+function toggleStokLow(){
+  STATE.stokLow = !STATE.stokLow;
+  var b=document.getElementById('btnStokLow'); if(b) b.classList.toggle('active', !!STATE.stokLow);
+  renderStok();
+}
+function renderStok(){
+  const q=(document.getElementById('cariStok')&&document.getElementById('cariStok').value||'').toLowerCase();
+  const aktif=STATE.data.produk.filter(p=>Number(p.aktif)!==0);
+  const menipis=aktif.filter(p=>num(p.stok)<=num(p.stok_min)).length;
+  const dash=document.getElementById('stokDash');
+  if(dash) dash.innerHTML='<div class="dstat"><span>Produk aktif</span><b>'+aktif.length+'</b></div><div class="dstat"><span>Stok menipis</span><b>'+menipis+'</b></div><div class="dstat"><span>Nilai stok (HPP)</span><b>'+rp(aktif.reduce((s,p)=>s+num(p.stok)*num(p.harga_beli),0))+'</b></div>';
+  const body=document.getElementById('stokBody'); if(!body) return;
+  body.innerHTML=aktif.filter(p=>{
+    const low=num(p.stok)<=num(p.stok_min);
+    if(STATE.stokLow && !low) return false;
+    if(!q) return true;
+    return (p.nama+' '+p.sku+' '+(p.barcode||'')).toLowerCase().indexOf(q)!==-1;
+  }).map(p=>{
+    const j=find(STATE.data.jenis,p.jenis_id)||{}; const k=find(STATE.data.kategori,p.kategori_id)||{};
+    const low=num(p.stok)<=num(p.stok_min);
+    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
+      '<button class="btn-sm btn-ghost" onclick=\'openProduk('+JSON.stringify(p.id)+')\'>Ubah</button> '+
+      '<button class="btn-sm btn-ghost" onclick=\'openAdjust('+JSON.stringify(p.id)+')\'>Stok</button></td></tr>';
+  }).join('')||'<tr><td colspan="8" class="muted">Tidak ada produk</td></tr>';
+}
+function openProduk(id){
+  const p=id?find(STATE.data.produk,id):{sku:'',barcode:'',nama:'',kategori_id:STATE.data.kategori[0]&&STATE.data.kategori[0].id,jenis_id:'J1',supplier_id:STATE.data.supplier[0]&&STATE.data.supplier[0].id,satuan:'pcs',harga_beli:0,harga_jual:0,harga_dingin:0,stok:0,stok_min:0};
+  modal('<h3>'+(id?'Ubah produk':'Produk baru')+'</h3>'+
+    '<div class="two"><div><label class="fld">Nama</label><input id="fNama" value="'+esc(p.nama||'')+'"></div><div><label class="fld">SKU</label><input id="fSku" value="'+esc(p.sku||'')+'"></div></div>'+
+    '<div class="two"><div><label class="fld">Barcode</label><input id="fBar" value="'+esc(p.barcode||'')+'"></div><div><label class="fld">Satuan</label><select id="fSat"><option>pcs</option><option>kg</option><option>gram</option><option>liter</option><option>ml</option><option>pack</option><option>dus</option></select></div></div>'+
+    '<div class="three"><div><label class="fld">Kategori</label><select id="fKat">'+STATE.data.kategori.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
+    '<div><label class="fld">Jenis</label><select id="fJen">'+STATE.data.jenis.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
+    '<div><label class="fld">Supplier</label><select id="fSup">'+STATE.data.supplier.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div></div>'+
+    '<div class="three"><div><label class="fld">Harga beli</label><input id="fHb" type="number" value="'+num(p.harga_beli)+'"></div>'+
+    '<div><label class="fld">Harga jual / biasa</label><input id="fHj" type="number" value="'+num(p.harga_jual)+'"></div>'+
+    '<div><label class="fld">Harga dingin</label><input id="fHd" type="number" value="'+num(p.harga_dingin)+'"></div></div>'+
+    '<div class="two"><div><label class="fld">Stok</label><input id="fStok" type="number" step="0.01" value="'+num(p.stok)+'"></div><div><label class="fld">Stok minimum</label><input id="fMin" type="number" step="0.01" value="'+num(p.stok_min)+'"></div></div>'+
+    '<p class="hint">Jenis Minuman: isi harga biasa & dingin. Jenis Berat: harga jual = harga per kg/liter. Satuan pcs untuk barang unit.</p>'+
+    '<button class="btn full" style="margin-top:10px" onclick=\'simpanProduk('+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
+  setTimeout(()=>{
+    document.getElementById('fSat').value=p.satuan||'pcs';
+    document.getElementById('fKat').value=p.kategori_id; document.getElementById('fJen').value=p.jenis_id; document.getElementById('fSup').value=p.supplier_id;
+  },0);
+}
+async function simpanProduk(id){
+  const payload={id:id||undefined,nama:val('fNama'),sku:val('fSku'),barcode:val('fBar'),satuan:val('fSat'),kategori_id:val('fKat'),jenis_id:val('fJen'),supplier_id:val('fSup'),harga_beli:val('fHb'),harga_jual:val('fHj'),harga_dingin:val('fHd'),stok:val('fStok'),stok_min:val('fMin'),aktif:1};
+  try{ await API('saveProduk',payload); if(useRemote()) STATE.data.produk=await API('getProduk'); closeModal(); renderStok(); renderProdukKasir(); toast('Produk disimpan'); }catch(e){ toast(e.message); }
+}
+function openAdjust(id){
+  const p=find(STATE.data.produk,id);
+  modal('<h3>Penyesuaian stok · '+esc(p.nama)+'</h3><p>Stok sekarang '+fmtQty(p.stok,p.satuan)+'</p>'+
+    '<label class="fld">Delta (+ masuk / − keluar)</label><input id="fDelta" type="number" step="0.01" value="0">'+
+    '<button class="btn full" style="margin-top:10px" onclick=\'doAdjust('+JSON.stringify(id)+')\'>Simpan</button>');
+}
+async function doAdjust(id){
+  try{ await API('adjustStok',{produk_id:id,delta:val('fDelta')}); if(useRemote()) STATE.data.produk=await API('getProduk'); closeModal(); renderStok(); renderProdukKasir(); toast('Stok diubah'); }catch(e){ toast(e.message); }
+}
+function pilihBeliSupplier(id){
+  const sel=document.getElementById('beliSupplier');
+  if(sel) sel.value=id;
+  onBeliSupplier();
+}
+function onBeliSupplier(){
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
+  if(STATE.beli.length && STATE._beliSup && STATE._beliSup!==sid){
+    if(!confirm('Ganti supplier akan mengosongkan item faktur ini?')){
+      document.getElementById('beliSupplier').value=STATE._beliSup; return;
+    }
+    STATE.beli=[];
+  }
+  STATE._beliSup=sid;
+  document.querySelectorAll('.sup-card').forEach(el=>el.classList.toggle('sel', el.dataset.id===sid));
+  const hint=document.getElementById('beliSupHint');
+  const s=find(STATE.data.supplier,sid);
+  if(hint) hint.textContent=s?('Faktur untuk '+s.nama+' — barang supplier ini tampil di atas.'):'Pilih supplier.';
+  fillBeliProduk();
+  renderBeliItems();
+}
+function fillBeliProduk(){
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
+  const aktif=(STATE.data.produk||[]).filter(p=>Number(p.aktif)!==0);
+  const mine=aktif.filter(p=>p.supplier_id===sid);
+  const other=aktif.filter(p=>p.supplier_id!==sid);
+  const opt=function(p){ return '<option value="'+p.id+'">'+esc(p.nama)+' · '+rp(p.harga_beli)+'/'+esc(p.satuan||'pcs')+'</option>'; };
+  let html='';
+  if(mine.length) html+='<optgroup label="Produk supplier ini">'+mine.map(opt).join('')+'</optgroup>';
+  if(other.length) html+='<optgroup label="Produk lain">'+other.map(opt).join('')+'</optgroup>';
+  const sel=document.getElementById('beliProduk');
+  if(sel){ sel.innerHTML=html||'<option value="">Tidak ada produk</option>'; onBeliProduk(); }
+}
+function onBeliProduk(){
+  const p=find(STATE.data.produk,(document.getElementById('beliProduk')||{}).value);
+  const h=document.getElementById('beliHarga');
+  if(p && h && !h.value) h.value=num(p.harga_beli);
+  else if(p && h) h.value=num(p.harga_beli);
+}
+function renderBeliForm(){
+  const list=STATE.data.supplier.filter(s=>Number(s.aktif)!==0);
+  const pick=document.getElementById('beliSupPick');
+  if(pick){
+    pick.innerHTML=list.map(s=>{
+      const n=(STATE.data.pembelian||[]).filter(b=>b.supplier_id===s.id);
+      const tot=n.reduce((a,b)=>a+num(b.total),0);
+      return '<button type="button" class="sup-card" data-id="'+s.id+'" onclick="pilihBeliSupplier(\''+s.id+'\')">'+esc(s.nama)+'<small>'+n.length+' faktur · '+rp(tot)+'</small></button>';
+    }).join('')||'<span class="muted">Belum ada supplier. Tambah di menu Supplier.</span>';
+  }
+  const sel=document.getElementById('beliSupplier');
+  if(sel){
+    const cur=sel.value||STATE._beliSup|| (list[0]&&list[0].id)||'';
+    sel.innerHTML=list.map(s=>'<option value="'+s.id+'">'+esc(s.nama)+'</option>').join('');
+    if(cur) sel.value=cur;
+  }
+  const fil=document.getElementById('beliFilterSup');
+  if(fil){
+    const fv=fil.value||'semua';
+    fil.innerHTML='<option value="semua">Semua supplier</option>'+list.map(s=>'<option value="'+s.id+'">'+esc(s.nama)+'</option>').join('');
+    fil.value=fv;
+  }
+  onBeliSupplier();
+  renderBeliHist();
+}
+function addBeliItem(){
+  if(!(document.getElementById('beliSupplier')||{}).value) return toast('Pilih supplier dulu');
+  const id=document.getElementById('beliProduk').value, qty=num(document.getElementById('beliQty').value), harga=num(document.getElementById('beliHarga').value);
+  const p=find(STATE.data.produk,id); if(!p||qty<=0) return toast('Qty tidak valid');
+  STATE.beli.push({produk_id:id,qty,harga_beli:harga||p.harga_beli}); renderBeliItems();
+  document.getElementById('beliQty').value='';
+}
+function renderBeliItems(){
+  let tot=0;
+  const box=document.getElementById('beliItems'); if(!box) return;
+  box.innerHTML=STATE.beli.map((it,i)=>{ const p=find(STATE.data.produk,it.produk_id)||{nama:'?'}; const sub=it.qty*it.harga_beli; tot+=sub;
+    return '<tr><td>'+esc(p.nama)+'</td><td>'+it.qty+'</td><td>'+rp(it.harga_beli)+'</td><td>'+rp(sub)+'</td><td><button class="btn-sm btn-ghost" onclick="STATE.beli.splice('+i+',1);renderBeliItems()">✕</button></td></tr>';
+  }).join('')||'<tr><td colspan="5" class="muted">Belum ada item</td></tr>';
+  const t=document.getElementById('beliTotal'); if(t) t.textContent='Total '+rp(tot);
+}
+function renderBeliHist(){
+  const fid=(document.getElementById('beliFilterSup')||{}).value||'semua';
+  let rows=(STATE.data.pembelian||[]).slice();
+  if(fid!=='semua') rows=rows.filter(b=>b.supplier_id===fid);
+  const dash=document.getElementById('beliDash');
+  if(dash){
+    const tot=rows.reduce((s,b)=>s+num(b.total),0);
+    dash.innerHTML='<div class="dstat"><span>Faktur</span><b>'+rows.length+'</b></div><div class="dstat"><span>Nilai beli</span><b>'+rp(tot)+'</b></div>';
+  }
+  const body=document.getElementById('beliHist'); if(!body) return;
+  body.innerHTML=rows.map(b=>{
+    const s=find(STATE.data.supplier,b.supplier_id);
+    return '<tr><td>'+esc(b.nomor)+'</td><td>'+esc(b.tanggal)+'</td><td>'+esc(s?s.nama:'')+'</td><td>'+rp(b.total)+'</td></tr>';
+  }).join('')||'<tr><td colspan="4" class="muted">Belum ada pembelian</td></tr>';
+}
+async function simpanPembelian(){
+  const sid=(document.getElementById('beliSupplier')||{}).value;
+  if(!sid) return toast('Pilih supplier');
+  if(!STATE.beli.length) return toast('Item faktur kosong');
+  try{
+    const res=await API('pembelian',{supplier_id:sid,catatan:document.getElementById('beliCatatan').value,items:STATE.beli});
+    if(useRemote()){
+      STATE.beli.forEach(function(it){
+        const pr=find(STATE.data.produk,it.produk_id);
+        if(pr) pr.stok=roundQ(num(pr.stok)+num(it.qty));
+      });
+      STATE.data.pembelian=STATE.data.pembelian||[];
+      STATE.data.pembelian.unshift(res);
+      API('getProduk').then(function(p){ if(p) STATE.data.produk=p; }).catch(function(){});
+    }
+    STATE.beli=[]; document.getElementById('beliCatatan').value='';
+    renderBeliForm(); renderStok(); toast('Faktur '+res.nomor+' · '+(find(STATE.data.supplier,sid)||{}).nama+' tersimpan');
+  }catch(e){ toast(e.message); }
+}
+
+/* ================= HUTANG ================= */
+async function renderHutang(){
+  let list;
+  list=await API('getHutang');
+  const sum=list.reduce((s,x)=>s+num(x.saldo_hutang),0);
+  document.getElementById('sumPiutang').textContent=rp(sum);
+  document.getElementById('hutangBody').innerHTML=list.map(p=>'<tr><td>'+esc(p.nama)+'</td><td>'+esc(p.telp||'')+'</td><td>'+esc(p.alamat||'')+'</td><td><b>'+rp(p.saldo_hutang)+'</b></td><td>'+
+    '<button class="btn-sm btn-ghost" onclick=\'openPelanggan('+JSON.stringify(p.id)+')\'>Ubah</button> '+
+    '<button class="btn-sm btn" onclick=\'openHutangDetail('+JSON.stringify(p.id)+')\'>Rincian</button> '+
+    '<button class="btn-sm btn-gold" onclick=\'openCicil('+JSON.stringify(p.id)+')\'>Cicil</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Belum ada pelanggan. Tambah dari tombol + Pelanggan.</td></tr>';
+}
+async function openHutangDetail(id){
+  let det;
+  det=await API('getHutangDetail',{pelanggan_id:id});
+  const pl=det.pelanggan; const hist=det.riwayat||[];
+  const rows=hist.map(h=>{
+    const plus=h.jenis==='hutang';
+    return '<div class="tl '+(plus?'':'cicilan')+'"><div><b>'+(plus?'Hutang belanja':'Cicilan / bayar')+'</b> · '+esc(h.tanggal)+'</div>'+
+      '<div class="'+(plus?'danger-txt':'ok-txt')+'">'+(plus?'+ ':'− ')+rp(h.jumlah)+'</div>'+
+      '<div class="muted">'+esc(h.keterangan||'')+(h.referensi?' · ref '+h.referensi:'')+'</div>'+
+      '<div class="muted">Saldo '+rp(h.saldo_sebelum)+' → '+rp(h.saldo_sesudah)+'</div></div>';
+  }).join('')||'<div class="empty">Belum ada mutasi</div>';
+  modal('<h3>'+esc(pl.nama)+'</h3><p>Sisa hutang <b>'+rp(pl.saldo_hutang)+'</b></p><div class="timeline">'+rows+'</div>'+
+    '<button class="btn" onclick=\'closeModal();openCicil('+JSON.stringify(id)+')\'>Bayar / cicil</button>');
+}
+function openCicil(id){
+  const pl=find(STATE.data.pelanggan,id);
+  modal('<h3>Cicilan · '+esc(pl.nama)+'</h3><p>Sisa '+rp(pl.saldo_hutang)+'</p>'+
+    '<label class="fld">Nominal bayar</label><input id="cicilNom" type="number" value="'+Math.min(pl.saldo_hutang||0,10000)+'">'+
+    '<label class="fld">Keterangan</label><input id="cicilKet" value="Cicilan hutang">'+
+    '<button class="btn full" style="margin-top:10px" onclick=\'doCicil('+JSON.stringify(id)+')\'>Simpan cicilan</button>');
+}
+async function doCicil(id){
+  try{
+    await API('bayarHutang',{pelanggan_id:id,jumlah:val('cicilNom'),keterangan:val('cicilKet')});
+    if(useRemote()) STATE.data.pelanggan=await API('getPelanggan');
+    closeModal(); renderHutang(); renderPelangganSelect(true); refreshDash(); toast('Cicilan tersimpan');
+  }catch(e){ toast(e.message); }
+}
+function openPelanggan(id){
+  const o=id? (find(STATE.data.pelanggan,id)||{}) : {};
+  if(id && !find(STATE.data.pelanggan,id)) return toast('Pelanggan tidak ditemukan');
+  const idJs=id?JSON.stringify(String(id)):'null';
+  modal('<h3>'+(id?'Ubah pelanggan':'Pelanggan baru')+'</h3>'+
+    '<label class="fld">Nama</label><input id="plNama" value="'+esc(o.nama||'')+'" placeholder="Nama pelanggan" autocomplete="name">'+
+    '<label class="fld">Telp</label><input id="plTelp" value="'+esc(o.telp||'')+'" placeholder="08…" inputmode="tel" autocomplete="tel">'+
+    '<label class="fld">Alamat</label><input id="plAlamat" value="'+esc(o.alamat||'')+'" placeholder="Opsional">'+
+    '<button class="btn full" id="plSaveBtn" type="button" style="margin-top:12px" onclick=\'simpanPelanggan('+idJs+')\'>Simpan</button>');
+  setTimeout(function(){ var el=document.getElementById('plNama'); if(el){ el.focus(); if(!id) el.select(); } },0);
+}
+async function simpanPelanggan(id){
+  if(window._plLock) return;
+  let nama='', telp='', alamat='';
+  try{
+    nama=String(val('plNama')||'').trim();
+    telp=String(val('plTelp')||'').trim();
+    alamat=String(val('plAlamat')||'').trim();
+  }catch(e){ return toast('Form pelanggan tidak siap'); }
+  if(!nama) return toast('Nama pelanggan wajib');
+  const payload={nama:nama,telp:telp,alamat:alamat};
+  if(id) payload.id=id;
+  window._plLock=true;
+  try{
+    const saved=await API('savePelanggan', payload);
+    const row=(saved && saved.id) ? saved : Object.assign({aktif:1,saldo_hutang:0}, payload);
+    STATE.data.pelanggan=STATE.data.pelanggan||[];
+    if(row.id){
+      const ix=STATE.data.pelanggan.findIndex(x=>String(x.id)===String(row.id));
+      if(ix>=0) STATE.data.pelanggan[ix]=Object.assign({}, STATE.data.pelanggan[ix], row);
+      else STATE.data.pelanggan.push(row);
+    }
+    if(useRemote()){
+      try{
+        const list=await API('getPelanggan');
+        if(Array.isArray(list)) STATE.data.pelanggan=list;
+      }catch(e){}
+    }
+    closeModal();
+    renderPelangganSelect(true, row.id);
+    try{ if(STATE.view==='hutang') await renderHutang(); }catch(e){}
+    toast(id?'Pelanggan diubah':'Pelanggan ditambah');
+  }catch(e){ toast(e.message||'Gagal simpan pelanggan'); }
+  finally{ window._plLock=false; }
+}
+
+/* ================= RETUR & MASTER & LAPORAN ================= */
+function renderReturJual(){
+  document.getElementById('rjTrans').innerHTML='<option value="">— pilih —</option>'+STATE.data.penjualan.map(p=>'<option value="'+p.id+'">'+p.nomor+' · '+p.tanggal+' · '+rp(p.total)+'</option>').join('');
+  document.getElementById('rjHist').innerHTML=STATE.data.returJual.map(r=>'<tr><td>'+r.nomor+'</td><td>'+r.tanggal+'</td><td>'+r.penjualan_id+'</td><td>'+rp(r.total)+'</td><td>'+esc(r.metode_refund||'')+'</td></tr>').join('');
+  document.getElementById('rjItems').innerHTML='';
+}
+async function isiReturJual(){
+  const id=document.getElementById('rjTrans').value; if(!id) return;
+  let items=STATE.data.penjualanItem.filter(x=>x.penjualan_id===id);
+  if(useRemote()){ const d=await API('getPenjualanDetail',{id}); items=d.items||[]; STATE.data.penjualanItem=STATE.data.penjualanItem.concat(items); }
+  document.getElementById('rjItems').innerHTML='<div class="table-wrap"><table><thead><tr><th>Produk</th><th>Qty asal</th><th>Qty retur</th></tr></thead><tbody>'+
+    items.map(it=>'<tr><td>'+esc(it.nama_produk)+'</td><td>'+fmtQty(it.qty,it.satuan)+'</td><td><input data-rj="'+it.produk_id+'" type="number" step="0.01" max="'+it.qty+'" value="0"></td></tr>').join('')+'</tbody></table></div>';
+}
+async function simpanReturJual(){
+  const id=document.getElementById('rjTrans').value; if(!id) return toast('Pilih transaksi');
+  const items=[...document.querySelectorAll('[data-rj]')].map(el=>({produk_id:el.dataset.rj,qty:num(el.value)})).filter(x=>x.qty>0);
+  try{
+    const res=await API('returPenjualan',{penjualan_id:id,items,alasan:document.getElementById('rjAlasan').value,metode_refund:document.getElementById('rjMetode').value});
+    if(useRemote()){ STATE.data.produk=await API('getProduk'); STATE.data.returJual=await API('getReturPenjualan',{}); STATE.data.pelanggan=await API('getPelanggan'); }
+    renderReturJual(); renderProdukKasir(); toast('Retur '+res.nomor+' tersimpan');
+  }catch(e){ toast(e.message); }
+}
+function renderReturBeli(){
+  document.getElementById('rbTrans').innerHTML='<option value="">— pilih —</option>'+STATE.data.pembelian.map(p=>'<option value="'+p.id+'">'+p.nomor+' · '+rp(p.total)+'</option>').join('');
+  document.getElementById('rbHist').innerHTML=STATE.data.returBeli.map(r=>'<tr><td>'+r.nomor+'</td><td>'+r.tanggal+'</td><td>'+r.pembelian_id+'</td><td>'+rp(r.total)+'</td></tr>').join('');
+}
+async function isiReturBeli(){
+  const id=document.getElementById('rbTrans').value; if(!id) return;
+  let items=STATE.data.pembelianItem.filter(x=>x.pembelian_id===id);
+  if(useRemote()){ const d=await API('getPembelianDetail',{id}); items=d.items||[]; STATE.data.pembelianItem=STATE.data.pembelianItem.concat(items); }
+  document.getElementById('rbItems').innerHTML='<div class="table-wrap"><table><thead><tr><th>Produk</th><th>Qty asal</th><th>Qty retur</th></tr></thead><tbody>'+
+    items.map(it=>'<tr><td>'+esc(it.nama_produk)+'</td><td>'+it.qty+'</td><td><input data-rb="'+it.produk_id+'" type="number" step="0.01" value="0"></td></tr>').join('')+'</tbody></table></div>';
+}
+async function simpanReturBeli(){
+  const id=document.getElementById('rbTrans').value; if(!id) return toast('Pilih pembelian');
+  const items=[...document.querySelectorAll('[data-rb]')].map(el=>({produk_id:el.dataset.rb,qty:num(el.value)})).filter(x=>x.qty>0);
+  try{
+    const res=await API('returPembelian',{pembelian_id:id,items,alasan:document.getElementById('rbAlasan').value});
+    if(useRemote()){ STATE.data.produk=await API('getProduk'); STATE.data.returBeli=await API('getReturPembelian',{}); }
+    renderReturBeli(); toast('Retur '+res.nomor+' tersimpan');
+  }catch(e){ toast(e.message); }
+}
+function renderKategori(){
+  document.getElementById('katBody').innerHTML=STATE.data.kategori.map(k=>'<tr><td>'+esc(k.nama)+'</td><td><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:'+k.warna+'"></span> '+k.warna+'</td><td><button class="btn-sm btn-ghost" onclick=\'openSimple("kategori",'+JSON.stringify(k.id)+')\'>Ubah</button></td></tr>').join('');
+}
+function renderJenis(){
+  document.getElementById('jenisBody').innerHTML=STATE.data.jenis.map(k=>'<tr><td>'+esc(k.nama)+'</td><td>'+esc(k.kode)+'</td><td>'+esc(k.deskripsi||'')+'</td><td><button class="btn-sm btn-ghost" onclick=\'openSimple("jenis",'+JSON.stringify(k.id)+')\'>Ubah</button></td></tr>').join('');
+}
+function renderSupplier(){
+  document.getElementById('supBody').innerHTML=STATE.data.supplier.map(k=>'<tr><td>'+esc(k.nama)+'</td><td>'+esc(k.telp||'')+'</td><td>'+esc(k.alamat||'')+'</td><td><button class="btn-sm btn-ghost" onclick=\'openSimple("supplier",'+JSON.stringify(k.id)+')\'>Ubah</button></td></tr>').join('');
+}
+function openSimple(kind,id){
+  const maps={kategori:STATE.data.kategori,jenis:STATE.data.jenis,supplier:STATE.data.supplier};
+  const o=id?find(maps[kind],id):{};
+  let fields='<label class="fld">Nama</label><input id="sNama" value="'+esc(o.nama||'')+'">';
+  if(kind==='kategori') fields+='<label class="fld">Warna</label><input id="sWarna" value="'+esc(o.warna||'#0ea5e9')+'">';
+  if(kind==='jenis') fields+='<label class="fld">Kode (satuan / minuman / berat)</label><input id="sKode" value="'+esc(o.kode||'')+'"><label class="fld">Deskripsi</label><input id="sDesk" value="'+esc(o.deskripsi||'')+'">';
+  if(kind==='supplier') fields+='<label class="fld">Telp</label><input id="sTelp" value="'+esc(o.telp||'')+'"><label class="fld">Alamat</label><input id="sAlamat" value="'+esc(o.alamat||'')+'">';
+  modal('<h3>'+kind+'</h3>'+fields+'<button class="btn full" style="margin-top:10px" onclick=\'saveSimple("'+kind+'",'+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
+}
+async function saveSimple(kind,id){
+  const acts={kategori:'saveKategori',jenis:'saveJenis',supplier:'saveSupplier'};
+  const payload={id:id||undefined,nama:val('sNama'),aktif:1};
+  if(kind==='kategori') payload.warna=val('sWarna');
+  if(kind==='jenis'){ payload.kode=val('sKode'); payload.deskripsi=val('sDesk'); }
+  if(kind==='supplier'){ payload.telp=val('sTelp'); payload.alamat=val('sAlamat'); }
+  try{ await API(acts[kind],payload); if(useRemote()){ STATE.data.kategori=await API('getKategori'); STATE.data.jenis=await API('getJenis'); STATE.data.supplier=await API('getSupplier'); } closeModal(); showView(kind); toast('Tersimpan'); }catch(e){ toast(e.message); }
+}
+async function renderLaporan(){
+  const jenis=document.getElementById('lapJenis').value, from=document.getElementById('lapFrom').value, to=document.getElementById('lapTo').value;
+  const lapKasir=document.getElementById('lapKasir');
+  if(lapKasir){
+    const cur=lapKasir.value||'semua';
+    const users=(STATE.data.user||[]).filter(u=>Number(u.aktif)!==0);
+    lapKasir.innerHTML='<option value="semua">Semua kasir</option>'+users.map(u=>'<option value="'+u.id+'">'+esc(u.nama||u.username)+'</option>').join('');
+    if(STATE.user&&STATE.user.role!=='admin'){ lapKasir.value=STATE.user.id; lapKasir.disabled=true; }
+    else { lapKasir.disabled=false; lapKasir.value=cur; }
+  }
+  const lap=await API('getLaporan',{jenis,from,to});
+  const uid=(lapKasir&&lapKasir.value)||'semua';
+  let rows=lap.rows||[];
+  if(uid!=='semua') rows=rows.filter(r=>String(r.user_id||'')===String(uid));
+  const total=rows.reduce((s,r)=>s+num(r.total),0);
+  document.getElementById('lapCount').textContent=rows.length;
+  document.getElementById('lapTotal').textContent=rp(total);
+  document.getElementById('lapBody').innerHTML=rows.map(r=>{
+    const u=find(STATE.data.user,r.user_id);
+    return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+esc(metodeLabel(r.metode)||r.status||r.metode_refund||'')+'</td><td>'+rp(r.total)+'</td></tr>';
+  }).join('')||'<tr><td colspan="5" class="muted">Tidak ada data</td></tr>';
+}
+
+function inRangeTgl(tgl, from, to){
+  var d=String(tgl||'').slice(0,10);
+  if(from && d<from) return false;
+  if(to && d>to) return false;
+  return true;
+}
+async function ensureLedger(){
+  const d=STATE.data; if(!d.kas) d.kas=[];
+  if(!useRemote()) return;
+  const need = !(d.penjualanItem&&d.penjualanItem.length) || !(d.hutang&&d.hutang.length) || d._ledgerLoaded!==true;
+  if(!need && d._ledgerLoaded) return;
+  try{
+    const pack=await API('getLedger',{});
+    if(pack.penjualanItem) d.penjualanItem=pack.penjualanItem;
+    if(pack.pembelianItem) d.pembelianItem=pack.pembelianItem;
+    if(pack.returJualItem) d.returJualItem=pack.returJualItem;
+    if(pack.returBeliItem) d.returBeliItem=pack.returBeliItem;
+    if(pack.hutang) d.hutang=pack.hutang;
+    if(pack.kas) d.kas=pack.kas;
+    if(pack.tutupKasir) d.tutupKasir=pack.tutupKasir;
+    d._ledgerLoaded=true;
+  }catch(e){ /* tetap pakai data yang ada */ }
+}
+function labaLines(from, to){
+  const pjs=(STATE.data.penjualan||[]).filter(p=>inRangeTgl(p.tanggal,from,to) && p.status!=='batal');
+  const ids={}; pjs.forEach(p=>ids[p.id]=p);
+  const lines=[];
+  (STATE.data.penjualanItem||[]).forEach(it=>{
+    if(!ids[it.penjualan_id]) return;
+    const pr=find(STATE.data.produk,it.produk_id)||{};
+    const omzet=num(it.subtotal);
+    const hpp=roundM(num(it.qty)*num(pr.harga_beli));
+    lines.push({produk_id:it.produk_id,nama:it.nama_produk||pr.nama||'-',kategori_id:pr.kategori_id||'',qty:num(it.qty),omzet:omzet,hpp:hpp,laba:roundM(omzet-hpp)});
+  });
+  const rjs=(STATE.data.returJual||[]).filter(r=>inRangeTgl(r.tanggal,from,to));
+  const rids={}; rjs.forEach(r=>rids[r.id]=r);
+  (STATE.data.returJualItem||[]).forEach(it=>{
+    if(!rids[it.retur_id]) return;
+    const pr=find(STATE.data.produk,it.produk_id)||{};
+    const omzet=-num(it.subtotal);
+    const hpp=-roundM(num(it.qty)*num(pr.harga_beli));
+    lines.push({produk_id:it.produk_id,nama:it.nama_produk||pr.nama||'-',kategori_id:pr.kategori_id||'',qty:-num(it.qty),omzet:omzet,hpp:hpp,laba:roundM(omzet-hpp)});
+  });
+  return lines;
+}
+async function renderLaba(){
+  await ensureLedger();
+  const from=document.getElementById('labaFrom').value, to=document.getElementById('labaTo').value;
+  const katSel=document.getElementById('labaKat');
+  const cur=katSel.value||'semua';
+  katSel.innerHTML='<option value="semua">Semua kategori</option>'+(STATE.data.kategori||[]).map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('');
+  katSel.value=cur;
+  let lines=labaLines(from,to);
+  if(cur && cur!=='semua') lines=lines.filter(x=>x.kategori_id===cur);
+  const omzet=lines.reduce((s,x)=>s+x.omzet,0), hpp=lines.reduce((s,x)=>s+x.hpp,0), laba=roundM(omzet-hpp);
+  const margin=omzet? Math.round(laba/omzet*1000)/10 : 0;
+  const pjs=(STATE.data.penjualan||[]).filter(p=>inRangeTgl(p.tanggal,from,to) && p.status!=='batal');
+  const omzetHdr=pjs.reduce((s,p)=>s+num(p.total),0);
+  document.getElementById('labaDash').innerHTML=
+    '<div class="dstat"><span>Omzet</span><b>'+rp(lines.length?omzet:omzetHdr)+'</b></div>'+
+    '<div class="dstat"><span>HPP</span><b>'+rp(hpp)+'</b></div>'+
+    '<div class="dstat"><span>Laba kotor</span><b class="'+(laba>=0?'ok-txt':'danger-txt')+'">'+rp(laba)+'</b></div>'+
+    '<div class="dstat"><span>Margin</span><b>'+margin+'%</b></div>';
+  const byKat={};
+  lines.forEach(x=>{
+    const id=x.kategori_id||'_';
+    if(!byKat[id]) byKat[id]={omzet:0,hpp:0,laba:0};
+    byKat[id].omzet+=x.omzet; byKat[id].hpp+=x.hpp; byKat[id].laba+=x.laba;
+  });
+  const katRows=Object.keys(byKat).map(id=>{
+    const k=find(STATE.data.kategori,id)||{nama: id==='_'?'Tanpa kategori':id};
+    const r=byKat[id]; const m=r.omzet? Math.round(r.laba/r.omzet*1000)/10 : 0;
+    return {nama:k.nama, omzet:r.omzet, hpp:r.hpp, laba:r.laba, margin:m};
+  }).sort((a,b)=>b.laba-a.laba);
+  document.getElementById('labaKatBody').innerHTML=katRows.map(r=>
+    '<tr><td>'+esc(r.nama)+'</td><td>'+rp(r.omzet)+'</td><td>'+rp(r.hpp)+'</td><td class="'+(r.laba>=0?'ok-txt':'danger-txt')+'">'+rp(r.laba)+'</td><td>'+r.margin+'%</td></tr>'
+  ).join('')||'<tr><td colspan="5" class="muted">Belum ada penjualan di periode ini. Jual dulu di kasir, atau muat item (ledger) jika data cloud.</td></tr>';
+  const byPr={};
+  lines.forEach(x=>{
+    const id=x.produk_id||x.nama;
+    if(!byPr[id]) byPr[id]={nama:x.nama,kategori_id:x.kategori_id,qty:0,omzet:0,hpp:0,laba:0};
+    byPr[id].qty+=x.qty; byPr[id].omzet+=x.omzet; byPr[id].hpp+=x.hpp; byPr[id].laba+=x.laba;
+  });
+  const prRows=Object.keys(byPr).map(id=>byPr[id]).sort((a,b)=>b.laba-a.laba);
+  document.getElementById('labaProdBody').innerHTML=prRows.map(r=>{
+    const k=find(STATE.data.kategori,r.kategori_id)||{nama:'-'};
+    return '<tr><td>'+esc(r.nama)+'</td><td>'+esc(k.nama)+'</td><td>'+roundQ(r.qty)+'</td><td>'+rp(r.omzet)+'</td><td>'+rp(r.hpp)+'</td><td class="'+(r.laba>=0?'ok-txt':'danger-txt')+'">'+rp(r.laba)+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="muted">Tidak ada rincian produk</td></tr>';
+}
+function arusRows(from, to){
+  const rows=[];
+  (STATE.data.penjualan||[]).filter(p=>inRangeTgl(p.tanggal,from,to) && p.status!=='batal').forEach(p=>{
+    const m=String(p.metode||'tunai').toLowerCase();
+    if(m==='tunai' || m==='campuran'){
+      const masuk = m==='tunai' ? num(p.bayar||p.total) : num(p.bayar);
+      if(masuk>0) rows.push({tanggal:p.tanggal, sumber:'Penjualan '+p.nomor+(m==='campuran'?' (tunai)':''), masuk:masuk, keluar:0});
+    }
+  });
+  (STATE.data.hutang||[]).filter(h=>h.jenis==='cicilan' && inRangeTgl(h.tanggal,from,to)).forEach(h=>{
+    const pl=find(STATE.data.pelanggan,h.pelanggan_id);
+    rows.push({tanggal:h.tanggal, sumber:'Cicilan '+(pl?pl.nama:h.pelanggan_id), masuk:num(h.jumlah), keluar:0});
+  });
+  (STATE.data.pembelian||[]).filter(b=>inRangeTgl(b.tanggal,from,to)).forEach(b=>{
+    const s=find(STATE.data.supplier,b.supplier_id);
+    rows.push({tanggal:b.tanggal, sumber:'Beli '+(b.nomor||'')+' · '+(s?s.nama:''), masuk:0, keluar:num(b.total)});
+  });
+  (STATE.data.returJual||[]).filter(r=>inRangeTgl(r.tanggal,from,to)).forEach(r=>{
+    const m=String(r.metode_refund||'tunai');
+    if(m!=='potong_hutang') rows.push({tanggal:r.tanggal, sumber:'Retur jual '+r.nomor, masuk:0, keluar:num(r.total)});
+  });
+  (STATE.data.returBeli||[]).filter(r=>inRangeTgl(r.tanggal,from,to)).forEach(r=>{
+    rows.push({tanggal:r.tanggal, sumber:'Retur beli '+r.nomor, masuk:num(r.total), keluar:0});
+  });
+  (STATE.data.kas||[]).filter(k=>inRangeTgl(k.tanggal,from,to)).forEach(k=>{
+    const masuk=k.jenis==='masuk'?num(k.jumlah):0, keluar=k.jenis==='keluar'?num(k.jumlah):0;
+    rows.push({tanggal:k.tanggal, sumber:k.keterangan||('Kas '+k.jenis), masuk:masuk, keluar:keluar});
+  });
+  rows.sort((a,b)=>String(a.tanggal).localeCompare(String(b.tanggal)));
+  return rows;
+}
+async function renderArusKas(){
+  await ensureLedger();
+  const from=document.getElementById('arusFrom').value, to=document.getElementById('arusTo').value;
+  const rows=arusRows(from,to);
+  let saldo=0, masuk=0, keluar=0;
+  const body=rows.map(r=>{
+    masuk+=r.masuk; keluar+=r.keluar; saldo=roundM(saldo+r.masuk-r.keluar);
+    return '<tr><td>'+esc(r.tanggal)+'</td><td>'+esc(r.sumber)+'</td><td class="num-in">'+(r.masuk?rp(r.masuk):'')+'</td><td class="num-out">'+(r.keluar?rp(r.keluar):'')+'</td><td><b>'+rp(saldo)+'</b></td></tr>';
+  }).join('')||'<tr><td colspan="5" class="muted">Belum ada arus kas di periode ini</td></tr>';
+  document.getElementById('arusDash').innerHTML=
+    '<div class="dstat"><span>Masuk</span><b class="ok-txt">'+rp(masuk)+'</b></div>'+
+    '<div class="dstat"><span>Keluar</span><b class="danger-txt">'+rp(keluar)+'</b></div>'+
+    '<div class="dstat"><span>Netto</span><b class="'+(saldo>=0?'ok-txt':'danger-txt')+'">'+rp(saldo)+'</b></div>'+
+    '<div class="dstat"><span>Mutasi</span><b>'+rows.length+'</b></div>';
+  document.getElementById('arusBody').innerHTML=body;
+}
+async function simpanKasLain(){
+  const jenis=val('kasJenis'), jumlah=num(val('kasJumlah')), ket=val('kasKet');
+  if(jumlah<=0) return toast('Nominal tidak valid');
+  try{
+    const row=await API('saveKas',{jenis:jenis,jumlah:jumlah,keterangan:ket,tanggal:nowIso()});
+    STATE.data.kas=STATE.data.kas||[];
+    if(useRemote()) STATE.data.kas.push(row && row.id ? row : {tanggal:nowIso(),jenis:jenis,jumlah:jumlah,keterangan:ket});
+    document.getElementById('kasJumlah').value=''; document.getElementById('kasKet').value='';
+    renderArusKas(); toast('Kas tercatat');
+  }catch(e){ toast(e.message); }
+}
+function renderUser(){
+  document.getElementById('userBody').innerHTML=STATE.data.user.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.nama)+'</td><td>'+esc(u.role)+'</td><td>'+(Number(u.aktif)?'Aktif':'Nonaktif')+'</td><td><button class="btn-sm btn-ghost" onclick=\'openUser('+JSON.stringify(u.id)+')\'>Ubah</button></td></tr>').join('');
+}
+function openUser(id){
+  const u=id?find(STATE.data.user,id):{username:'',nama:'',role:'kasir'};
+  modal('<h3>User</h3><label class="fld">Username</label><input id="uUser" value="'+esc(u.username||'')+'"><label class="fld">Nama</label><input id="uNama" value="'+esc(u.nama||'')+'">'+
+    '<label class="fld">Role</label><select id="uRole"><option value="admin">admin</option><option value="kasir">kasir</option></select>'+
+    '<label class="fld">Password '+(id?'(kosongkan jika tidak diganti)':'')+'</label><input id="uPass" type="password">'+
+    '<button class="btn full" style="margin-top:10px" onclick=\'simpanUser('+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
+  setTimeout(()=>{ document.getElementById('uRole').value=u.role||'kasir'; },0);
+}
+async function simpanUser(id){
+  const payload={id:id||undefined,username:val('uUser'),nama:val('uNama'),role:val('uRole'),aktif:1};
+  const pw=val('uPass'); if(pw) payload.password=pw;
+  try{ await API('saveUser',payload); if(useRemote()) STATE.data.user=await API('getUsers'); closeModal(); renderUser(); toast('User disimpan'); }catch(e){ toast(e.message); }
+}
+function updateRepo(){
+  try{
+    var el=document.getElementById('updRepo');
+    if(el && el.value.trim()) return el.value.trim().replace(/^https?:\/\/github.com\//,'');
+    var s=localStorage.getItem('warungpos_update_repo');
+    if(s && s.trim()) return s.trim();
+  }catch(e){}
+  return String(window.WARUNGPOS_UPDATE_REPO||CONFIG.UPDATE_REPO||'dhonisatyaji-ai/warungpos').trim();
+}
+function renderUpdate(){
+  var repo=updateRepo();
+  var el=document.getElementById('updRepo'); if(el && !el.value) el.value=repo;
+  var kpi=document.getElementById('updKpi');
+  if(kpi) kpi.innerHTML=
+    '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
+    '<div class="dstat"><span>Repo</span><b style="font-size:13px">'+esc(repo)+'</b></div>';
+  cekUpdate(true);
+}
+async function fetchVersionJson(repo){
+  var t=Date.now();
+  var urls=[
+    {u:'https://api.github.com/repos/'+repo+'/contents/version.json?ref=main&_'+t, raw:true},
+    {u:'https://raw.githubusercontent.com/'+repo+'/main/version.json?t='+t},
+    {u:'https://cdn.jsdelivr.net/gh/'+repo+'@main/version.json?t='+t}
+  ];
+  var last=new Error('Tidak bisa cek pembaruan');
+  for(var i=0;i<urls.length;i++){
+    try{
+      var opt={cache:'no-store'};
+      if(urls[i].raw) opt.headers={'Accept':'application/vnd.github.raw+json'};
+      var r=await fetch(urls[i].u, opt);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      var j=await r.json();
+      if(j && j.version) return j;
+      throw new Error('version.json tidak valid');
+    }catch(e){ last=e; }
+  }
+  throw last;
+}
+async function cekUpdate(quiet){
+  var msg=document.getElementById('updMsg');
+  var notes=document.getElementById('updNotes');
+  var dot=document.getElementById('updDot');
+  var repo=updateRepo();
+  try{ localStorage.setItem('warungpos_update_repo', repo); }catch(e){}
+  if(msg && !quiet) msg.textContent='Mengecek GitHub…';
+  try{
+    var info=await fetchVersionJson(repo);
+    window._updRemote=info;
+    var newer=String(info.version||'')>String(APP_VERSION);
+    if(dot) dot.classList.toggle('app-hidden', !newer);
+    if(notes) notes.textContent=info.catatan?('Catatan: '+info.catatan):'';
+    var kpi=document.getElementById('updKpi');
+    if(kpi) kpi.innerHTML=
+      '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
+      '<div class="dstat"><span>Versi GitHub</span><b class="'+(newer?'ok-txt':'')+'">'+esc(info.version)+'</b></div>'+
+      '<div class="dstat"><span>Status</span><b class="'+(newer?'ok-txt':'')+'">'+(newer?'Ada pembaruan':'Sudah yang terbaru')+'</b></div>';
+    if(msg) msg.textContent=newer?('Versi baru '+info.version+' siap dipasang.'):(quiet?'':'Aplikasi sudah versi terbaru.');
+    return info;
+  }catch(e){
+    if(msg && !quiet) msg.textContent='Gagal cek: '+(e.message||e)+'. Pastikan file version.json ada di root repo.';
+    return null;
+  }
+}
+function githubPagesUrl(){
+  var repo=updateRepo();
+  var parts=String(repo||'').split('/').filter(Boolean);
+  if(parts.length>=2) return 'https://'+parts[0]+'.github.io/'+parts[1].replace(/\.git$/,'')+'/';
+  return 'https://dhonisatyaji-ai.github.io/warungpos/';
+}
+function onExecUrl(){
+  try{ return /script\.google\.com\/macros\//.test(String(location.href||'')); }catch(e){ return false; }
+}
+function pasangUpdate(){
+  var repo=updateRepo();
+  try{ localStorage.setItem('warungpos_update_repo', repo); localStorage.setItem('warungpos_force_update', String(Date.now())); }catch(e){}
+  var msg=document.getElementById('updMsg');
+  var dest;
+  if(onExecUrl() || onAppsScript()){
+    dest=githubPagesUrl()+'?v='+Date.now();
+    if(msg) msg.textContent='Membuka versi GitHub…';
+  }else{
+    dest=location.href.split('#')[0].split('?')[0]+'?v='+Date.now();
+    if(msg) msg.textContent='Memuat ulang ke versi baru…';
+  }
+  location.replace(dest);
+}
+function renderPengaturan(){
+  const s=STATE.data.pengaturan||{};
+  document.getElementById('setNama').value=s.toko_nama||'';
+  document.getElementById('setTelp').value=s.toko_telp||'';
+  document.getElementById('setAlamat').value=s.toko_alamat||'';
+  document.getElementById('setFooter').value=s.toko_footer||'';
+  document.getElementById('setSbUrl').value=CONFIG.SB_URL||'';
+  document.getElementById('setSbKey').value=CONFIG.SB_KEY||'';
+  var gEl=document.getElementById('setGasUrl');
+  if(gEl){ try{ gEl.value=localStorage.getItem('warungpos_gas_url')||''; }catch(e){ gEl.value=''; } }
+}
+async function simpanPengaturan(){
+  var urlEl=document.getElementById('setSbUrl');
+  var keyEl=document.getElementById('setSbKey');
+  var url=urlEl?String(urlEl.value||'').trim():'';
+  var key=keyEl?String(keyEl.value||'').trim():'';
+  if(url && key) applySb(url, key);
+  try{
+    var gu=(document.getElementById('setGasUrl')||{}).value||'';
+    gu=String(gu).trim();
+    if(gu) localStorage.setItem('warungpos_gas_url', gu);
+    else localStorage.removeItem('warungpos_gas_url');
+    window.WARUNGPOS_GAS_URL=gu;
+  }catch(e){}
+  const payload={toko_nama:document.getElementById('setNama').value,toko_telp:document.getElementById('setTelp').value,toko_alamat:document.getElementById('setAlamat').value,toko_footer:document.getElementById('setFooter').value};
+  persistPengaturan(payload);
+  var side=document.getElementById('tokoNamaSide'); if(side) side.textContent=payload.toko_nama||'WarungPOS';
+  try{
+    await API('savePengaturan', payload);
+    toast('Pengaturan disimpan');
+  }catch(e){
+    toast('Disimpan di perangkat ini');
+  }
+}
+function resetDemo(){ if(confirm('Hapus data lokal di perangkat ini? Sesi tetap masuk.')){ localStorage.removeItem(LS_KEY); STATE.data=seed(); saveDB(); toast('Data lokal dihapus'); location.reload(); } }
+
+/* ================= STOK OPNAME ================= */
+function renderOpname(){
+  const tgl=document.getElementById('opTgl');
+  if(tgl && !tgl.value) tgl.value=todayStr();
+  const kat=document.getElementById('opKat');
+  if(kat){
+    const cur=kat.value||'semua';
+    kat.innerHTML='<option value="semua">Semua kategori</option>'+(STATE.data.kategori||[]).map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('');
+    kat.value=cur;
+  }
+  renderOpnameForm();
+  renderOpnameHist();
+}
+function opnameFilteredProduk(){
+  const q=(document.getElementById('opCari')&&document.getElementById('opCari').value||'').toLowerCase();
+  const kid=(document.getElementById('opKat')||{}).value||'semua';
+  return (STATE.data.produk||[]).filter(p=>{
+    if(Number(p.aktif)===0) return false;
+    if(kid!=='semua' && p.kategori_id!==kid) return false;
+    if(!q) return true;
+    return (p.nama+' '+p.sku+' '+(p.barcode||'')).toLowerCase().indexOf(q)!==-1;
+  });
+}
+function opnameKatLabel(){
+  const kid=(document.getElementById('opKat')||{}).value||'semua';
+  if(kid==='semua') return 'Semua kategori';
+  const k=find(STATE.data.kategori,kid);
+  return (k&&k.nama)||'Kategori';
+}
+function cetakOpnameLembar(){
+  const list=opnameFilteredProduk();
+  if(!list.length) return toast('Tidak ada produk untuk dicetak');
+  const set=STATE.data.pengaturan||{};
+  const tgl=(document.getElementById('opTgl')||{}).value||todayStr();
+  const catatan=(document.getElementById('opCatatan')||{}).value||'';
+  const rows=list.map(function(p,i){
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc(p.sku||'')+'</td><td><b>'+esc(p.nama)+'</b>'+
+      (p.barcode?'<br><small>'+esc(p.barcode)+'</small>':'')+'</td><td>'+esc(p.satuan||'pcs')+'</td>'+
+      '<td style="text-align:right">'+fmtQty(p.stok,p.satuan)+'</td><td class="isi-fisik"></td><td class="isi-fisik"></td></tr>';
+  }).join('');
+  const html='<div class="op-sheet">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px">'+
+    '<div><b style="font-size:18px">'+esc(set.toko_nama||'WarungPOS')+'</b><br><span style="font-size:12px">'+esc(set.toko_alamat||'')+'</span></div>'+
+    '<div style="text-align:right"><b>LEMBAR HITUNG STOK FISIK</b><br><span style="font-size:12px">Tanggal '+esc(tgl)+'<br>'+esc(opnameKatLabel())+' · '+list.length+' item</span></div>'+
+    '</div>'+
+    (catatan?'<p style="font-size:12px;margin:0 0 8px">Catatan: '+esc(catatan)+'</p>':'')+
+    '<p style="font-size:12px;margin:0 0 10px">Tulis jumlah barang nyata di rak pada kolom <b>Stok fisik</b>. Kolom sistem hanya acuan — jangan disalin jika berbeda.</p>'+
+    '<table class="op-print"><thead><tr><th style="width:36px">No</th><th style="width:90px">SKU</th><th>Nama barang</th><th style="width:56px">Sat</th><th style="width:80px">Sistem</th><th style="width:100px">Stok fisik</th><th style="width:70px">Paraf</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="op-ttd"><div><div class="garis">Dihitung oleh</div></div><div><div class="garis">Diperiksa</div></div><div><div class="garis">Tanggal / cap toko</div></div></div>'+
+    '<p style="font-size:11px;color:#57534e;margin-top:14px">Dicetak '+esc(nowIso?nowIso():todayStr())+' · '+esc((STATE.user&&STATE.user.nama)||'')+'</p>'+
+    '</div>';
+  printHtml(html, true);
+}
+function renderOpnameForm(){
+  const list=opnameFilteredProduk();
+  const body=document.getElementById('opBody'); if(!body) return;
+  body.innerHTML=list.map(p=>{
+    const fisikId='opf_'+p.id;
+    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.nama)+'</td><td>'+esc(p.satuan||'')+'</td>'+
+      '<td>'+fmtQty(p.stok,p.satuan)+'</td>'+
+      '<td><input id="'+fisikId+'" data-op="'+p.id+'" data-sist="'+num(p.stok)+'" type="number" step="0.01" min="0" placeholder="—" style="width:100px" oninput="hitungOpnameRow(this)"></td>'+
+      '<td id="opsel_'+p.id+'" class="muted">—</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="muted">Tidak ada produk</td></tr>';
+  hitungOpnameDash();
+}
+function hitungOpnameRow(el){
+  const sist=num(el.dataset.sist);
+  const td=document.getElementById('opsel_'+el.dataset.op);
+  if(!el.value && el.value!=='0'){ if(td){ td.textContent='—'; td.className='muted'; } hitungOpnameDash(); return; }
+  const sel=roundQ(num(el.value)-sist);
+  if(td){ td.textContent=(sel>0?'+':'')+sel; td.className=sel===0?'muted':(sel>0?'ok-txt':'danger-txt'); }
+  hitungOpnameDash();
+}
+function hitungOpnameDash(){
+  const inputs=[...document.querySelectorAll('[data-op]')];
+  let isi=0, plus=0, min=0;
+  inputs.forEach(el=>{
+    if(el.value==='' && el.value!=='0') return;
+    if(String(el.value).trim()==='') return;
+    isi++;
+    const sel=num(el.value)-num(el.dataset.sist);
+    if(sel>0) plus+=sel; else if(sel<0) min+=-sel;
+  });
+  const dash=document.getElementById('opDash');
+  if(dash) dash.innerHTML=
+    '<div class="dstat"><span>Sudah dihitung</span><b>'+isi+' / '+inputs.length+'</b></div>'+
+    '<div class="dstat"><span>Lebih (fisik)</span><b class="ok-txt">'+roundQ(plus)+'</b></div>'+
+    '<div class="dstat"><span>Kurang (fisik)</span><b class="danger-txt">'+roundQ(min)+'</b></div>';
+}
+function opnameIsiSistem(){
+  document.querySelectorAll('[data-op]').forEach(el=>{ el.value=el.dataset.sist; hitungOpnameRow(el); });
+}
+function opnameKosongFisik(){
+  document.querySelectorAll('[data-op]').forEach(el=>{ el.value=''; hitungOpnameRow(el); });
+}
+function bacaOpnameItems(){
+  return [...document.querySelectorAll('[data-op]')].filter(el=>String(el.value).trim()!=='').map(el=>({
+    produk_id:el.dataset.op, stok_sistem:num(el.dataset.sist), stok_fisik:num(el.value)
+  }));
+}
+async function simpanOpname(){
+  const items=bacaOpnameItems();
+  if(!items.length) return toast('Isi stok fisik minimal satu produk');
+  if(!confirm('Simpan opname '+items.length+' produk dan sesuaikan stok sistem?')) return;
+  try{
+    const res=await API('opname',{tanggal:(document.getElementById('opTgl')||{}).value||todayStr(), catatan:(document.getElementById('opCatatan')||{}).value, items:items});
+    if(useRemote()){ STATE.data.produk=await API('getProduk'); try{ STATE.data.opname=await API('getOpname'); }catch(e){} }
+    document.getElementById('opCatatan').value='';
+    renderOpname(); renderStok(); renderProdukKasir();
+    toast('Opname '+(res.nomor||'')+' tersimpan. Stok disesuaikan.');
+  }catch(e){ toast(e.message); }
+}
+async function renderOpnameHist(){
+  let list=STATE.data.opname||[];
+  try{ if(useRemote()) list=await API('getOpname')||list; STATE.data.opname=list; }catch(e){}
+  const body=document.getElementById('opHist'); if(!body) return;
+  body.innerHTML=(list||[]).map(r=>'<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+(r.jumlah_item||'')+'</td><td>'+esc(r.catatan||'')+'</td><td><button class="btn-sm btn-ghost" onclick=\'lihatOpname('+JSON.stringify(r.id)+')\'>Rincian</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Belum ada opname</td></tr>';
+}
+async function lihatOpname(id){
+  let items=(STATE.data.opnameItem||[]).filter(x=>x.opname_id===id);
+  const h=find(STATE.data.opname,id)||{nomor:id};
+  if(useRemote() && !items.length){
+    try{ const d=await API('getOpnameDetail',{id:id}); items=d.items||[]; }catch(e){}
+  }
+  const rows=items.map(it=>{
+    const sel=num(it.selisih);
+    return '<tr><td>'+esc(it.nama_produk)+'</td><td>'+it.stok_sistem+'</td><td>'+it.stok_fisik+'</td><td class="'+(sel===0?'':(sel>0?'ok-txt':'danger-txt'))+'">'+(sel>0?'+':'')+sel+'</td></tr>';
+  }).join('')||'<tr><td colspan="4" class="muted">Tidak ada item</td></tr>';
+  modal('<h3>Opname '+esc(h.nomor||'')+'</h3><p class="hint">'+esc(h.tanggal||'')+' · '+esc(h.catatan||'')+'</p>'+
+    '<div class="table-wrap"><table><thead><tr><th>Produk</th><th>Sistem</th><th>Fisik</th><th>Selisih</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="row-btns" style="margin-top:10px"><button class="btn" type="button" onclick=\'cetakOpnameHasil('+JSON.stringify(String(id))+')\'>Cetak hasil</button></div>');
+}
+function cetakOpnameHasil(id){
+  const h=find(STATE.data.opname,id)||{nomor:id};
+  let items=(STATE.data.opnameItem||[]).filter(x=>x.opname_id===id);
+  const set=STATE.data.pengaturan||{};
+  const rows=items.map(function(it,i){
+    const sel=num(it.selisih);
+    return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc(it.nama_produk||'')+'</td>'+
+      '<td style="text-align:right">'+esc(it.stok_sistem)+'</td><td style="text-align:right">'+esc(it.stok_fisik)+'</td>'+
+      '<td style="text-align:right">'+(sel>0?'+':'')+sel+'</td></tr>';
+  }).join('')||'<tr><td colspan="5">Tidak ada item</td></tr>';
+  const html='<div class="op-sheet">'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:10px">'+
+    '<div><b style="font-size:18px">'+esc(set.toko_nama||'WarungPOS')+'</b></div>'+
+    '<div style="text-align:right"><b>HASIL STOK OPNAME</b><br><span style="font-size:12px">'+esc(h.nomor||'')+' · '+esc(h.tanggal||'')+'</span></div></div>'+
+    (h.catatan?'<p style="font-size:12px">Catatan: '+esc(h.catatan)+'</p>':'')+
+    '<table class="op-print"><thead><tr><th>No</th><th>Produk</th><th>Sistem</th><th>Fisik</th><th>Selisih</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="op-ttd"><div><div class="garis">Dibuat</div></div><div><div class="garis">Diperiksa</div></div><div><div class="garis">Disetujui</div></div></div>'+
+    '</div>';
+  printHtml(html, true);
+}
+
+/* ================= TUTUP KASIR ================= */
+const PECAHAN=[
+  {k:'u20', n:20000, label:'Rp 20.000'},
+  {k:'u10', n:10000, label:'Rp 10.000'},
+  {k:'u5', n:5000, label:'Rp 5.000'},
+  {k:'u2', n:2000, label:'Rp 2.000'},
+  {k:'u1', n:1000, label:'Rp 1.000'},
+  {k:'u500', n:500, label:'Rp 500'},
+  {k:'u200', n:200, label:'Rp 200'},
+  {k:'u100', n:100, label:'Rp 100'}
+];
+function parseRincian(r){
+  if(!r) return {};
+  if(typeof r==='string'){ try{ return JSON.parse(r)||{}; }catch(e){ return {}; } }
+  return r;
+}
+function tkKasirId(){
+  var el=document.getElementById('tkKasir');
+  if(el && el.value) return el.value;
+  return (STATE.user && STATE.user.id) || '';
+}
+function sameKasir(row, uid){
+  if(!uid) return true;
+  return String(row.user_id||'')===String(uid);
+}
+function fillTkKasir(){
+  var sel=document.getElementById('tkKasir'); if(!sel) return;
+  var me=STATE.user||{};
+  var isAdmin=me.role==='admin';
+  var cur=sel.value || me.id || '';
+  var users=(STATE.data.user||[]).filter(u=>Number(u.aktif)!==0);
+  if(!users.length && me.id) users=[{id:me.id,nama:me.nama,role:me.role,aktif:1}];
+  sel.innerHTML=users.map(u=>'<option value="'+u.id+'">'+esc(u.nama||u.username)+'</option>').join('');
+  if(!isAdmin){ sel.value=me.id; sel.disabled=true; }
+  else {
+    sel.disabled=false;
+    sel.value = users.some(u=>String(u.id)===String(cur)) ? cur : (me.id || (users[0]&&users[0].id) || '');
+  }
+}
+function omsetHari(tgl, uid){
+  var masuk=0;
+  (STATE.data.penjualan||[]).filter(p=>String(p.tanggal).slice(0,10)===tgl && p.status!=='batal' && sameKasir(p,uid)).forEach(p=>{
+    var m=String(p.metode||'tunai').toLowerCase();
+    if(m==='tunai') masuk+=num(p.bayar||p.total);
+    else if(m==='campuran') masuk+=num(p.bayar);
+  });
+  (STATE.data.hutang||[]).filter(h=>h.jenis==='cicilan' && String(h.tanggal).slice(0,10)===tgl && sameKasir(h,uid)).forEach(h=>{ masuk+=num(h.jumlah); });
+  return roundM(masuk);
+}
+function pengeluaranHari(tgl, uid){
+  var out=0;
+  (STATE.data.pembelian||[]).filter(b=>String(b.tanggal).slice(0,10)===tgl && sameKasir(b,uid)).forEach(b=>{ out+=num(b.total); });
+  (STATE.data.returJual||[]).filter(r=>String(r.tanggal).slice(0,10)===tgl && String(r.metode_refund||'tunai')!=='potong_hutang' && sameKasir(r,uid)).forEach(r=>{ out+=num(r.total); });
+  (STATE.data.kas||[]).filter(k=>k.jenis==='keluar' && String(k.tanggal).slice(0,10)===tgl && sameKasir(k,uid)).forEach(k=>{ out+=num(k.jumlah); });
+  return roundM(out);
+}
+function lastTutupBefore(tgl, uid){
+  return (STATE.data.tutupKasir||[]).filter(x=>String(x.tanggal).slice(0,10)<tgl && sameKasir(x,uid))
+    .sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal)))[0];
+}
+function tutupByTgl(tgl, uid){
+  return (STATE.data.tutupKasir||[]).find(x=>String(x.tanggal).slice(0,10)===tgl && sameKasir(x,uid));
+}
+function pecahanTotal(){
+  var s=0;
+  PECAHAN.forEach(function(p){
+    var el=document.getElementById('tk_'+p.k);
+    s += num(el&&el.value)*p.n;
+  });
+  return roundM(s);
+}
+function bacaPecahan(){
+  var o={};
+  PECAHAN.forEach(function(p){
+    var el=document.getElementById('tk_'+p.k);
+    o[p.k]=num(el&&el.value);
+  });
+  return o;
+}
+function isiPecahan(rincian){
+  rincian=parseRincian(rincian);
+  PECAHAN.forEach(function(p){
+    var el=document.getElementById('tk_'+p.k);
+    if(el) el.value=num(rincian[p.k]);
+  });
+}
+function hitungTutup(){
+  var awal=num((document.getElementById('tkModalAwal')||{}).value);
+  var omset=num(window._tkOmset||0);
+  var keluar=num(window._tkKeluar||0);
+  var besok=pecahanTotal();
+  var setor=roundM(awal+omset-keluar-besok);
+  PECAHAN.forEach(function(p){
+    var el=document.getElementById('tk_'+p.k);
+    var sub=document.getElementById('tksub_'+p.k);
+    if(sub) sub.textContent=rp(num(el&&el.value)*p.n);
+  });
+  var mb=document.getElementById('tkModalBesok'); if(mb) mb.textContent=rp(besok);
+  var st=document.getElementById('tkSetoran'); if(st){ st.textContent=rp(setor); st.style.color=setor<0?'var(--danger)':'var(--forest)'; }
+  var ring=document.getElementById('tkRingkas');
+  if(ring){
+    ring.innerHTML=
+      '<div class="dstat"><span>Modal awal</span><b>'+rp(awal)+'</b></div>'+
+      '<div class="dstat"><span>Omset (uang masuk)</span><b class="ok-txt">'+rp(omset)+'</b></div>'+
+      '<div class="dstat"><span>Pengeluaran</span><b class="danger-txt">'+rp(keluar)+'</b></div>'+
+      '<div class="dstat"><span>Modal besok</span><b>'+rp(besok)+'</b></div>'+
+      '<div class="dstat"><span>Setoran</span><b class="'+(setor<0?'danger-txt':'ok-txt')+'">'+rp(setor)+'</b></div>';
+  }
+  return {awal:awal, omset:omset, keluar:keluar, besok:besok, setor:setor, rincian:bacaPecahan()};
+}
+async function renderTutupKasir(){
+  await ensureLedger();
+  try{
+    if(useRemote()){
+      const list=await API('getTutupKasir',{});
+      if(list) STATE.data.tutupKasir=list;
+    }
+  }catch(e){}
+  const tglEl=document.getElementById('tkTgl');
+  if(!tglEl.value) tglEl.value=todayStr();
+  const tgl=tglEl.value;
+  fillTkKasir();
+  const uid=tkKasirId();
+  const isAdmin=STATE.user&&STATE.user.role==='admin';
+  const saved=tutupByTgl(tgl, uid);
+  const prev=lastTutupBefore(tgl, uid);
+  const peng=STATE.data.pengaturan||{};
+  let awal=0;
+  if(saved) awal=num(saved.modal_awal);
+  else if(prev) awal=num(prev.modal_besok);
+  else awal=num(peng.kas_modal_awal);
+  const omset=omsetHari(tgl, uid), keluar=pengeluaranHari(tgl, uid);
+  window._tkOmset=omset;
+  window._tkKeluar=keluar;
+  const awalInp=document.getElementById('tkModalAwal');
+  awalInp.value=awal;
+  awalInp.readOnly=!isAdmin;
+  awalInp.style.background=isAdmin?'#fff':'#f6f0e6';
+  const hint=document.getElementById('tkModalHint');
+  if(hint){
+    if(prev) hint.textContent='Dari modal besok tutup '+String(prev.tanggal).slice(0,10)+'. '+(isAdmin?'Admin boleh mengoreksi.':'Hanya admin yang boleh mengubah.');
+    else hint.textContent=isAdmin?'Belum ada tutup sebelumnya. Isi modal awal laci.':'Belum ada tutup sebelumnya. Minta admin mengisi modal awal.';
+  }
+  document.getElementById('tkCatatan').value=saved&&saved.catatan||'';
+  const box=document.getElementById('tkPecahan');
+  box.innerHTML=PECAHAN.map(p=>
+    '<div class="cell"><span>'+p.label+'</span>'+
+    '<input id="tk_'+p.k+'" type="number" min="0" step="1" value="0" oninput="hitungTutup()">'+
+    '<small id="tksub_'+p.k+'">Rp 0</small></div>'
+  ).join('');
+  isiPecahan(saved&&saved.rincian);
+  const dash=document.getElementById('tkDash');
+  const omsetTotal=(STATE.data.penjualan||[]).filter(p=>String(p.tanggal).slice(0,10)===tgl && p.status!=='batal').reduce((s,p)=>s+num(p.total),0);
+  dash.innerHTML=
+    '<div class="dstat"><span>Omset tunai (rumus)</span><b>'+rp(window._tkOmset)+'</b></div>'+
+    '<div class="dstat"><span>Omset total nota</span><b>'+rp(omsetTotal)+'</b></div>'+
+    '<div class="dstat"><span>Pengeluaran</span><b>'+rp(window._tkKeluar)+'</b></div>'+
+    '<div class="dstat"><span>Status</span><b>'+(saved?'Sudah ditutup':'Belum ditutup')+'</b></div>';
+  const st=document.getElementById('tkStatus');
+  if(saved) st.textContent='Sudah ditutup '+esc(saved.created_at||'')+(saved.user_id?' · user '+saved.user_id:'')+'. Simpan lagi untuk memperbarui.';
+  else st.textContent='Omset = penjualan tunai/campuran + cicilan. Pengeluaran = pembelian + retur tunai + kas keluar.';
+  const btn=document.getElementById('tkSimpanBtn');
+  if(btn){
+    if(saved && !isAdmin){ btn.disabled=true; btn.textContent='Sudah ditutup (hanya admin yang boleh ubah)'; }
+    else { btn.disabled=false; btn.textContent=saved?'Perbarui tutup kasir':'Simpan tutup kasir'; }
+  }
+  hitungTutup();
+  const hist=document.getElementById('tkHist');
+  let rows=(STATE.data.tutupKasir||[]).slice();
+  if(!(STATE.user&&STATE.user.role==='admin')) rows=rows.filter(x=>sameKasir(x, STATE.user&&STATE.user.id));
+  rows.sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal)));
+  hist.innerHTML=rows.map(r=>{
+    const u=find(STATE.data.user,r.user_id);
+    return '<tr><td>'+esc(String(r.tanggal).slice(0,10))+'</td><td>'+rp(r.modal_awal)+'</td><td>'+rp(r.omset)+'</td><td>'+rp(r.pengeluaran)+'</td><td>'+rp(r.modal_besok)+'</td><td><b>'+rp(r.setoran)+'</b></td><td>'+esc(u?u.nama:r.user_id||'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="muted">Belum ada tutup kasir</td></tr>';
+}
+async function simpanTutupKasir(){
+  const tgl=(document.getElementById('tkTgl')||{}).value||todayStr();
+  const isAdmin=STATE.user&&STATE.user.role==='admin';
+  let uidk=tkKasirId();
+  if(!isAdmin) uidk=(STATE.user&&STATE.user.id)||uidk;
+  const saved=tutupByTgl(tgl, uidk);
+  if(saved && !isAdmin) return toast('Anda sudah tutup kasir hari ini. Minta admin jika perlu diubah.');
+  if(!isAdmin && !saved){
+    const awal=num(document.getElementById('tkModalAwal').value);
+    const prev=lastTutupBefore(tgl, uidk);
+    const def=prev?num(prev.modal_besok):num((STATE.data.pengaturan||{}).kas_modal_awal);
+    if(Math.abs(awal-def)>0.009) return toast('Kasir tidak boleh mengubah modal awal');
+  }
+  const h=hitungTutup();
+  if(h.setor<0 && !confirm('Setoran minus '+rp(h.setor)+'. Tetap simpan?')) return;
+  const payload={
+    tanggal:tgl, modal_awal:h.awal, omset:h.omset, pengeluaran:h.keluar,
+    modal_besok:h.besok, setoran:h.setor, rincian:h.rincian,
+    catatan:document.getElementById('tkCatatan').value, user_id:uidk
+  };
+  try{
+    const row=await API('saveTutupKasir', payload);
+    STATE.data.tutupKasir=STATE.data.tutupKasir||[];
+    const i=STATE.data.tutupKasir.findIndex(x=>String(x.tanggal).slice(0,10)===tgl && String(x.user_id||'')===String(uidk));
+    const savedRow=row&&row.id?row:Object.assign({id:uid('TK'),tanggal:tgl,user_id:uidk,created_at:nowIso()}, payload);
+    if(i>=0) STATE.data.tutupKasir[i]=Object.assign({}, STATE.data.tutupKasir[i], savedRow);
+    else STATE.data.tutupKasir.push(savedRow);
+    const kn=find(STATE.data.user,uidk);
+    toast('Tutup kasir '+(kn?kn.nama:'')+' tersimpan. Setoran '+rp(h.setor)+'. Modal besok jadi modal awal kasir ini besok.');
+    renderTutupKasir();
+  }catch(e){ toast(e.message); }
+}
+function cetakTutupKasir(){
+  const h=hitungTutup();
+  const tgl=(document.getElementById('tkTgl')||{}).value||todayStr();
+  const set=STATE.data.pengaturan||{};
+  const rinci=PECAHAN.map(p=>{
+    const q=num((document.getElementById('tk_'+p.k)||{}).value);
+    if(!q) return '';
+    return '<div style="display:flex;justify-content:space-between"><span>'+p.label+' × '+q+'</span><span>'+rp(q*p.n)+'</span></div>';
+  }).join('');
+  const kn=find(STATE.data.user, tkKasirId())||STATE.user||{};
+  const html='<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>TUTUP KASIR<br>'+esc(tgl)+'<br>Kasir: '+esc(kn.nama||STATE.user&&STATE.user.nama||'')+
+    '<hr class="dashline">'+
+    '<div style="display:flex;justify-content:space-between"><span>Modal awal</span><span>'+rp(h.awal)+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span>Omset</span><span>'+rp(h.omset)+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span>Pengeluaran</span><span>'+rp(h.keluar)+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span>Modal besok</span><span>'+rp(h.besok)+'</span></div>'+
+    '<hr class="dashline"><b>Rincian modal besok</b>'+(rinci||'<div class="muted">-</div>')+
+    '<hr class="dashline"><div style="display:flex;justify-content:space-between"><b>SETORAN</b><b>'+rp(h.setor)+'</b></div>'+
+    '<hr class="dashline"><center>'+esc(document.getElementById('tkCatatan').value||'')+'</center></div>'+
+    '<div class="row-btns" style="margin-top:10px"><button class="btn" onclick="printStruk()">Cetak</button><button class="btn-ghost" onclick="closeModal()">Tutup</button></div>';
+  modal(html);
+  document.getElementById('printArea').innerHTML=html;
+}
+
+/* ================= HELPERS ================= */
+function modal(html){ const bg=document.getElementById('modalBg'); bg.classList.add('show'); bg.innerHTML='<div class="modal">'+html+'<div style="text-align:right;margin-top:8px"><button class="btn-ghost btn-sm" onclick="closeModal()">Tutup</button></div></div>'; }
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); document.getElementById('modalBg').innerHTML=''; }
+function val(id){ return document.getElementById(id).value; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='F2'){ e.preventDefault(); const i=document.getElementById('cariProduk'); if(i) i.focus(); }
+  if(e.key==='F8'){ e.preventDefault(); openBayar(); }
+  if(e.key==='Enter' && document.getElementById('loginPass')===document.activeElement) doLogin();
+});
+STATE.data=loadDB();
+(function boot(){
+  try {
+    ['navbar','navbar-iframe','cookieChoiceInfo','Attribution1'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.style.display='none';
+    });
+  } catch (e) {}
+  var _sb=readSb(); if (_sb.url && _sb.key) applySb(_sb.url, _sb.key);
+  try { hideGasBanner(); setTimeout(hideGasBanner, 250); setTimeout(hideGasBanner, 1200); } catch(e) {}
+  try { startGasBridge(); } catch(e) {}
+  try {
+    if (gasUrl() && !useSb()) {
+      setTimeout(function(){ API('ping', {}).catch(function(){}); }, 400);
+      if (!window._gasWarm) {
+        window._gasWarm=setInterval(function(){ if(!useSb()) API('ping', {}).catch(function(){}); }, 180000);
+      }
+    }
+  } catch(e) {}
+  armSplashEscape();
+  restoreSession();
+})();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36a6d952f26ea7e',t:'MTc4ODY2NTc3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
