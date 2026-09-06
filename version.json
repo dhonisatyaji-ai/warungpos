@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.24",
+  "version": "2026.09.06.25",
   "tanggal": "2026-09-06",
-  "catatan": "Cetak ulang struk hari ini di kasir. Laporan barang laku (gabung produk, tanpa invoice & kasir)."
+  "catatan": "Kasir: tombol draft/cetak ulang/kosongkan kotak berwarna. Pilih nota lalu cetak."
 }
