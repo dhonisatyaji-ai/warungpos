@@ -251,8 +251,6 @@ html.has-session .boot-splash{display:grid}
 </style>
 </head>
 <body>
-<script>window.WARUNGPOS_GAS_URL='https://script.google.com/macros/s/AKfycbzAiLP8fK7NF8Xe9FCF0xXV0DT7a3AP9kP3EU9AD9Y2E2cnCMRZohiQmm1OejWbpRRK/exec';window.WARUNGPOS_UPDATE_REPO="dhonisatyaji-ai/warungpos";</script>
-
 <div id="bootSplash" class="boot-splash" aria-hidden="true">
   <div>
     <div class="boot-mark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 7h16l-1.2 12.2A2 2 0 0 1 16.81 21H7.19a2 2 0 0 1-1.99-1.8L4 7Z" stroke="#e8c97a" stroke-width="1.7"/><path d="M8 7V5a4 4 0 0 1 8 0v2" stroke="#e8c97a" stroke-width="1.7"/></svg></div>
@@ -649,7 +647,9 @@ html.has-session .boot-splash{display:grid}
         <input id="setSbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
         <label class="fld">Kunci akses</label>
         <input id="setSbKey" placeholder="Kunci anon" autocomplete="off">
-        <p class="hint">Opsional. Diisi admin sekali di perangkat ini. Kosongkan jika data cukup tersimpan lokal.</p>
+        <p class="hint">Opsional (Supabase). Kosongkan = data tersimpan di HP/laptop ini, transaksi langsung tanpa loading Google.</p>
+        <label class="fld">URL Apps Script (opsional, lambat)</label>
+        <input id="setGasUrl" placeholder="Kosongkan jika pakai GitHub + data lokal/Supabase" autocomplete="off">
         <button class="btn" onclick="simpanPengaturan()">Simpan pengaturan</button>
         <button class="btn-ghost" onclick="resetDemo()">Hapus data lokal</button>
       </div>
@@ -687,7 +687,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.05.4';
+const APP_VERSION = '2026.09.06.3';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -826,8 +826,31 @@ function seed(){
     created_at:now
   };
 }
-function loadDB(){ try{ var d=JSON.parse(localStorage.getItem(LS_KEY)) || seed(); if(!d.kas) d.kas=[]; if(!d.tutupKasir) d.tutupKasir=[]; if(!d.opname) d.opname=[]; if(!d.opnameItem) d.opnameItem=[]; return d; }catch(e){ return seed(); } }
-function saveDB(){ localStorage.setItem(LS_KEY, JSON.stringify(STATE.data)); }
+function overlayPengaturan(d){
+  d=d||(STATE.data||{});
+  try{
+    var pg=JSON.parse(localStorage.getItem('warungpos_pengaturan')||'null');
+    if(pg && (pg.toko_nama||pg.toko_alamat||pg.toko_telp||pg.toko_footer)){
+      d.pengaturan=Object.assign({}, d.pengaturan||{}, pg);
+    }
+  }catch(e){}
+  return d;
+}
+function persistPengaturan(p){
+  STATE.data=STATE.data||{};
+  STATE.data.pengaturan=Object.assign({}, STATE.data.pengaturan||{}, p||{});
+  try{ localStorage.setItem('warungpos_pengaturan', JSON.stringify(STATE.data.pengaturan)); }catch(e){}
+  try{ saveDB(); }catch(e){}
+  return STATE.data.pengaturan;
+}
+function loadDB(){
+  try{
+    var d=JSON.parse(localStorage.getItem(LS_KEY)) || seed();
+    if(!d.kas) d.kas=[]; if(!d.tutupKasir) d.tutupKasir=[]; if(!d.opname) d.opname=[]; if(!d.opnameItem) d.opnameItem=[];
+    return overlayPengaturan(d);
+  }catch(e){ return overlayPengaturan(seed()); }
+}
+function saveDB(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(STATE.data)); }catch(e){} }
 function useSb(){ return !!(CONFIG.SB_URL && CONFIG.SB_KEY && CONFIG.SB_URL.indexOf('http')===0); }
 
 function sbHeaders(extra){
@@ -1066,7 +1089,9 @@ function bridgeCall(action, payload){
   });
 }
 function gasUrl(){
-  var u = String(window.WARUNGPOS_GAS_URL || CONFIG.GAS_URL || '').trim();
+  var u = '';
+  try { u = String(localStorage.getItem('warungpos_gas_url')||'').trim(); } catch(e){}
+  if (!u) u = String(window.WARUNGPOS_GAS_URL || CONFIG.GAS_URL || '').trim();
   if (u.slice(-1)==='/') u = u.slice(0,-1);
   var q = u.indexOf('?'); if (q>0) u = u.slice(0,q);
   return u;
@@ -1133,12 +1158,9 @@ function gasRun(action, payload){
 }
 async function gasCall(action, payload){
   var last = null;
-  if (!onAppsScript() && gasUrl()) {
-    var ready = await whenBridge(4000);
-    if (ready) {
-      try { return await bridgeCall(action, payload); }
-      catch (e) { last = e; }
-    }
+  if (window._wpBridgeOk) {
+    try { return await bridgeCall(action, payload); }
+    catch (e) { last = e; }
   }
   if (onAppsScript() && !window._gasRunSkip) {
     try { return await gasRun(action, payload); }
@@ -1151,7 +1173,7 @@ async function gasCall(action, payload){
     }
   }
   var big = false;
-  try { big = JSON.stringify(payload || {}).length > 1800; } catch (e) { big = true; }
+  try { big = JSON.stringify(payload || {}).length > 7000; } catch (e) { big = true; }
   if (gasUrl() && !big) {
     try { return await gasJsonp(action, payload); } catch (e) { last = e; }
   }
@@ -1487,7 +1509,10 @@ function toggleSide(){
 
 async function applyPack(pack){
   if(!pack) return;
-  if(pack.pengaturan) STATE.data.pengaturan=pack.pengaturan;
+  if(pack.pengaturan){
+    STATE.data.pengaturan=pack.pengaturan;
+    overlayPengaturan(STATE.data);
+  }
   if(pack.kategori) STATE.data.kategori=pack.kategori;
   if(pack.jenis) STATE.data.jenis=pack.jenis;
   if(pack.supplier) STATE.data.supplier=pack.supplier;
@@ -1638,6 +1663,7 @@ async function restoreSession(){
   if(useSb() || gasUrl() || onAppsScript()){
     loadRemoteAll().then(function(){
       STATE.backend = useSb() ? 'sb' : ((gasUrl()||onAppsScript()) ? 'gas' : STATE.backend);
+      overlayPengaturan(STATE.data);
       saveSession();
       try{ if(STATE.view) showView(STATE.view); }catch(e){}
     }).catch(function(){});
@@ -2015,6 +2041,42 @@ function selPay(m){
   if(bc) bc.classList.toggle('app-hidden', m!=='campuran');
   hitungKembalian();
 }
+function applyCartStock(cart, sign){
+  (cart||[]).forEach(function(it){
+    try{
+      const c=lineCalc(it);
+      if(c.p) c.p.stok=roundQ(num(c.p.stok)+sign*c.qty);
+    }catch(e){}
+  });
+}
+function applyHutangUi(metode, total, bayar, pelanggan_id, sign){
+  const hutangNom = metode==='hutang'?total:(metode==='campuran'?roundM(total-bayar):0);
+  if(hutangNom>0){
+    const pl=find(STATE.data.pelanggan,pelanggan_id);
+    if(pl) pl.saldo_hutang=roundM(num(pl.saldo_hutang)+sign*hutangNom);
+  }
+}
+function previewStruk(payload, totals){
+  const items=STATE.cart.map(function(it){
+    const c=lineCalc(it);
+    return {
+      produk_id:it.produk_id, nama_produk:c.p?c.p.nama:'', qty:c.qty, satuan:c.p?c.p.satuan:'pcs',
+      harga_satuan:c.harga, subtotal:c.sub, is_dingin:it.is_dingin?1:0,
+      mode_berat:it.mode_berat||'', nominal:it.nominal||0
+    };
+  });
+  let bayar=num(payload.bayar), kembalian=0;
+  if(payload.metode==='hutang'){ bayar=0; kembalian=0; }
+  else if(payload.metode==='campuran'){ kembalian=0; }
+  else if(isNonTunai(payload.metode)){ bayar=totals.total; kembalian=0; }
+  else kembalian=roundM(bayar-totals.total);
+  return {
+    id:'tmp'+Date.now(), nomor:'PJ-'+todayStr().replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10),
+    tanggal:nowIso(), pelanggan_id:payload.pelanggan_id, user_id:STATE.user&&STATE.user.id,
+    subtotal:totals.sub, diskon:totals.diskon, total:totals.total, bayar:bayar, kembalian:kembalian,
+    metode:payload.metode, status:'selesai', catatan:payload.catatan||'', items:items
+  };
+}
 async function prosesBayar(){
   if(window._bayarLock) return;
   const t=cartTotals(); const metode=window._pay||'tunai';
@@ -2024,42 +2086,61 @@ async function prosesBayar(){
   else if(metode==='campuran') bayar=num(document.getElementById('inCampur').value);
   else if(metode==='hutang') bayar=0;
   else if(isNonTunai(metode)) bayar=t.total;
+  if(!STATE.cart.length) return toast('Keranjang kosong');
+  if(metode==='hutang' && (!pelanggan_id || pelanggan_id==='P0')) return toast('Pelanggan wajib dipilih untuk hutang');
+  if(metode==='tunai' && bayar<t.total) return toast('Uang bayar kurang');
+  try{
+    STATE.cart.forEach(function(it){
+      const c=lineCalc(it);
+      if(!c.p) throw new Error('Produk tidak valid');
+      if(num(c.p.stok)+1e-9<c.qty) throw new Error('Stok '+c.p.nama+' tidak cukup');
+    });
+  }catch(e){ return toast(e.message); }
   const items=STATE.cart.map(it=>{
     return {produk_id:it.produk_id,qty:it.qty,is_dingin:it.is_dingin?1:0,mode_berat:it.mode_berat||'',nominal:it.nominal||0,satuan_input:it.satuan_input};
   });
+  const payload={items,pelanggan_id,metode,bayar,diskon:t.diskon,catatan:document.getElementById('catatanKasir').value};
   window._bayarLock=true;
-  toast('Menyimpan transaksi…');
+  const slow=!useSb() && !onAppsScript() && !window._wpBridgeOk && !!gasUrl();
   try{
-    const res=await API('penjualan',{items,pelanggan_id,metode,bayar,diskon:t.diskon,catatan:document.getElementById('catatanKasir').value});
-    if(useRemote()){
-      STATE.cart.forEach(it=>{
-        try{
-          const c=lineCalc(it);
-          if(c.p) c.p.stok=roundQ(num(c.p.stok)-c.qty);
-        }catch(e){}
+    if(slow){
+      const snap=STATE.cart.slice();
+      const preview=previewStruk(payload, t);
+      applyCartStock(snap, -1);
+      applyHutangUi(metode, t.total, bayar, pelanggan_id, 1);
+      closeModal(); struk(preview); clearCart(); renderProdukKasir(); refreshDash();
+      toast('Struk siap');
+      window._bayarLock=false;
+      API('penjualan', payload).then(function(res){
+        if(res){
+          STATE.data.penjualan=STATE.data.penjualan||[];
+          STATE.data.penjualan.unshift(res);
+        }
+        toast('Transaksi '+(res&&res.nomor?res.nomor:preview.nomor)+' tersimpan');
+      }).catch(function(e){
+        STATE.cart=(snap||[]).concat(STATE.cart||[]);
+        applyCartStock(snap, 1);
+        applyHutangUi(metode, t.total, bayar, pelanggan_id, -1);
+        renderProdukKasir();
+        toast('Gagal ke server: '+(e.message||e)+'. Keranjang dikembalikan.');
       });
+      return;
+    }
+    toast('Menyimpan transaksi…');
+    const res=await API('penjualan', payload);
+    if(useRemote()){
+      applyCartStock(STATE.cart, -1);
       if(res){
         STATE.data.penjualan=STATE.data.penjualan||[];
         STATE.data.penjualan.unshift(res);
       }
-      const hutangNom = metode==='hutang'?t.total:(metode==='campuran'?roundM(t.total-bayar):0);
-      if(hutangNom>0){
-        const pl=find(STATE.data.pelanggan,pelanggan_id);
-        if(pl) pl.saldo_hutang=roundM(num(pl.saldo_hutang)+hutangNom);
-      }
+      applyHutangUi(metode, t.total, bayar, pelanggan_id, 1);
     }
     closeModal();
     struk(res);
     clearCart();
     renderProdukKasir(); refreshDash();
     toast('Transaksi '+res.nomor+' tersimpan');
-    if(useRemote()){
-      Promise.all([API('getProduk'), API('getPelanggan')]).then(function(arr){
-        if(arr[0]) STATE.data.produk=arr[0];
-        if(arr[1]) STATE.data.pelanggan=arr[1];
-        renderProdukKasir();
-      }).catch(function(){});
-    }
   }catch(e){ toast(e.message); }
   finally { window._bayarLock=false; }
 }
@@ -2709,12 +2790,31 @@ function renderPengaturan(){
   document.getElementById('setFooter').value=s.toko_footer||'';
   document.getElementById('setSbUrl').value=CONFIG.SB_URL||'';
   document.getElementById('setSbKey').value=CONFIG.SB_KEY||'';
+  var gEl=document.getElementById('setGasUrl');
+  if(gEl){ try{ gEl.value=localStorage.getItem('warungpos_gas_url')||''; }catch(e){ gEl.value=''; } }
 }
 async function simpanPengaturan(){
-  applySb(document.getElementById('setSbUrl').value, document.getElementById('setSbKey').value);
+  var urlEl=document.getElementById('setSbUrl');
+  var keyEl=document.getElementById('setSbKey');
+  var url=urlEl?String(urlEl.value||'').trim():'';
+  var key=keyEl?String(keyEl.value||'').trim():'';
+  if(url && key) applySb(url, key);
+  try{
+    var gu=(document.getElementById('setGasUrl')||{}).value||'';
+    gu=String(gu).trim();
+    if(gu) localStorage.setItem('warungpos_gas_url', gu);
+    else localStorage.removeItem('warungpos_gas_url');
+    window.WARUNGPOS_GAS_URL=gu;
+  }catch(e){}
   const payload={toko_nama:document.getElementById('setNama').value,toko_telp:document.getElementById('setTelp').value,toko_alamat:document.getElementById('setAlamat').value,toko_footer:document.getElementById('setFooter').value};
-  try{ await API('savePengaturan',payload); STATE.data.pengaturan=Object.assign({}, STATE.data.pengaturan||{}, payload); document.getElementById('tokoNamaSide').textContent=payload.toko_nama; toast('Pengaturan disimpan'); }
-  catch(e){ STATE.data.pengaturan=payload; saveDB(); toast('Disimpan lokal. '+e.message); }
+  persistPengaturan(payload);
+  var side=document.getElementById('tokoNamaSide'); if(side) side.textContent=payload.toko_nama||'WarungPOS';
+  try{
+    await API('savePengaturan', payload);
+    toast('Pengaturan disimpan');
+  }catch(e){
+    toast('Disimpan di perangkat ini');
+  }
 }
 function resetDemo(){ if(confirm('Hapus data lokal di perangkat ini? Sesi tetap masuk.')){ localStorage.removeItem(LS_KEY); STATE.data=seed(); saveDB(); toast('Data lokal dihapus'); location.reload(); } }
 
@@ -3124,9 +3224,17 @@ STATE.data=loadDB();
   var _sb=readSb(); if (_sb.url && _sb.key) applySb(_sb.url, _sb.key);
   try { hideGasBanner(); setTimeout(hideGasBanner, 250); setTimeout(hideGasBanner, 1200); } catch(e) {}
   try { startGasBridge(); } catch(e) {}
+  try {
+    if (gasUrl() && !useSb()) {
+      setTimeout(function(){ API('ping', {}).catch(function(){}); }, 400);
+      if (!window._gasWarm) {
+        window._gasWarm=setInterval(function(){ if(!useSb()) API('ping', {}).catch(function(){}); }, 180000);
+      }
+    }
+  } catch(e) {}
   armSplashEscape();
   restoreSession();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a369bbfa195bbff8',t:'MTc4ODY1ODQ5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36a4321ec03e78f',t:'MTc4ODY2NDAzMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
