@@ -171,6 +171,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 th{background:#f6f0e6;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#57534e}
 tr:hover td{background:#fff7ed}
+th.col-aksi,td.col-aksi{position:sticky;right:0;z-index:2;min-width:118px;box-shadow:-8px 0 12px rgba(28,25,23,.06)}
+th.col-aksi{background:#f6f0e6}
+td.col-aksi{background:var(--card)}
+tr:hover td.col-aksi{background:#fff7ed}
+td.col-aksi .btn{white-space:nowrap}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .right{margin-left:auto}
 .pill{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800}
@@ -629,12 +634,12 @@ html.has-session .boot-splash{display:grid}
         <input type="date" id="lapTo">
         <select id="lapKasir" onchange="renderLaporan()" style="max-width:180px"></select>
         <button class="btn" onclick="renderLaporan()">Tampilkan</button>
-        <button class="btn-ghost" type="button" onclick="cetakLaporan()">Cetak</button>
+        <button class="btn-ghost" type="button" onclick="cetakLaporan()">Cetak laporan</button>
         <button class="btn-ghost" type="button" onclick="unduhLaporanCsv()">Unduh CSV</button>
       </div>
       <div class="dash"><div class="dstat"><span>Jumlah transaksi</span><b id="lapCount">0</b></div>
         <div class="dstat"><span>Total</span><b id="lapTotal">Rp 0</b></div></div>
-      <div class="table-wrap" id="printAreaWrap"><table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print"></th></tr></thead><tbody id="lapBody"></tbody></table></div>
+      <div class="table-wrap" id="printAreaWrap"><table><thead><tr><th>Nomor</th><th>Tanggal</th><th>Kasir</th><th>Metode / Status</th><th>Total</th><th class="skip-print col-aksi">Aksi</th></tr></thead><tbody id="lapBody"></tbody></table></div>
     </div>
 
     <!-- LABA -->
@@ -851,7 +856,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.19';
+const APP_VERSION = '2026.09.06.20';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3233,13 +3238,14 @@ async function renderLaporan(){
   document.getElementById('lapBody').innerHTML=rows.map(r=>{
     const u=find(STATE.data.user,r.user_id);
     let acts='';
-    if(jenis==='penjualan' && r.id){
-      acts+='<button type="button" class="btn-sm" data-struk-id="'+esc(String(r.id))+'">Struk</button> ';
-      if(bisaBatalPj(r)) acts+='<button type="button" class="btn-sm btn-ghost" data-batal-id="'+esc(String(r.id))+'">Batal</button>';
+    if(jenis==='penjualan' && (r.id || r.nomor)){
+      const sid=esc(String(r.id||r.nomor));
+      acts+='<button type="button" class="btn btn-sm" data-struk-id="'+sid+'">Cetak ulang</button> ';
+      if(bisaBatalPj(r)) acts+='<button type="button" class="btn-ghost btn-sm" data-batal-id="'+sid+'">Batal</button>';
     }
     const st=String(r.status||'');
     const met=esc((metodeLabel(r.metode)||r.status||r.metode_refund||'')+(st==='batal'?' · Batal':''));
-    return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+met+'</td><td>'+rp(r.total)+'</td><td class="skip-print">'+acts+'</td></tr>';
+    return '<tr><td>'+esc(r.nomor)+'</td><td>'+esc(r.tanggal)+'</td><td>'+esc(u?u.nama:(r.user_id||'-'))+'</td><td>'+met+'</td><td>'+rp(r.total)+'</td><td class="skip-print col-aksi">'+acts+'</td></tr>';
   }).join('')||'<tr><td colspan="6" class="muted">Tidak ada data</td></tr>';
   bindStrukLaporan();
 }
@@ -4012,10 +4018,12 @@ async function cetakUlangStruk(id){
   if(!id) return toast('Transaksi tidak ditemukan');
   try{
     let header=find(STATE.data.penjualan, id);
-    let items=(STATE.data.penjualanItem||[]).filter(function(x){ return String(x.penjualan_id)===id; });
+    if(!header) header=(STATE.data.penjualan||[]).find(function(p){ return String(p.nomor||'')===id || String(p.id||'')===id; });
+    let pid=header?String(header.id):id;
+    let items=(STATE.data.penjualanItem||[]).filter(function(x){ return String(x.penjualan_id)===pid || String(x.penjualan_id)===id; });
     if((!header || !items.length) && (typeof API==='function')){
       try{
-        const det=await API('getPenjualanDetail', {id:id});
+        const det=await API('getPenjualanDetail', {id:pid});
         if(det){
           header=header||det.header||(det.nomor?det:null);
           if((!items || !items.length) && det.items) items=det.items;
@@ -4469,5 +4477,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c15d14f3cdf8b',t:'MTc4ODY4MzE0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a36c20669a5adf9f',t:'MTc4ODY4MzU4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
