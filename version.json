@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.05.4",
+  "version": "2026.09.06.2",
   "tanggal": "2026-09-06",
-  "catatan": "Menu Update dari GitHub, cetak stok opname, QRIS/transfer/debit, tambah pelanggan, perbaikan splash login."
+  "catatan": "Aplikasi penuh di GitHub Pages. Data lokal (cepat) atau Supabase. Apps Script opsional."
 }
