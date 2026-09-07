@@ -552,7 +552,7 @@ html.has-session .boot-splash{display:grid}
       <div class="card" style="margin-bottom:12px">
         <div class="two">
           <div><label class="fld">Supplier</label><select id="beliSupplier" onchange="onBeliSupplier()"></select></div>
-          <div><label class="fld">No. faktur</label><input id="beliNomor" placeholder="Otomatis" autocomplete="off"></div>
+          <div><label class="fld">No. faktur</label><input id="beliNomor" placeholder="PB-tanggal-001" autocomplete="off"></div>
         </div>
         <p class="hint" id="beliSupHint">Pilih supplier di kartu atas atau di daftar.</p>
         <div class="toolbar" style="margin-top:10px">
@@ -566,7 +566,7 @@ html.has-session .boot-splash{display:grid}
         <div class="table-wrap"><table><thead><tr><th>Produk</th><th>Barcode</th><th>Qty</th><th>Harga beli</th><th>Subtotal</th><th></th></tr></thead><tbody id="beliItems"></tbody></table></div>
         <div class="row-btns" style="margin-top:10px">
           <b id="beliTotal">Total Rp 0</b>
-          <button class="btn right" onclick="simpanPembelian()">Simpan faktur supplier</button>
+          <button class="btn right" type="button" onclick="simpanPembelian()">Simpan faktur supplier</button>
         </div>
       </div>
       <div class="toolbar">
@@ -877,7 +877,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.27';
+const APP_VERSION = '2026.09.06.28';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1665,10 +1665,10 @@ function nextNomorBeli(){
   });
   return pre+String(max+1).padStart(3,'0');
 }
-function isiNomorBeli(){
+function isiNomorBeli(force){
   const el=document.getElementById('beliNomor');
   if(!el) return;
-  if(!el.value.trim()) el.value=nextNomorBeli();
+  if(force || !String(el.value||'').trim()) el.value=nextNomorBeli();
 }
 function localPembelian(p){
   const d=STATE.data, items=p.items||[]; if(!items.length) throw new Error('Item kosong');
@@ -1677,8 +1677,12 @@ function localPembelian(p){
   let nomor=String(p.nomor||'').trim() || nextNomorBeli();
   const dup=(d.pembelian||[]).some(function(b){ return String(b.nomor||'')===nomor; });
   if(dup) nomor=nextNomorBeli();
+  if(!d.pembelian) d.pembelian=[];
+  if(!d.pembelianItem) d.pembelianItem=[];
   items.forEach(it=>{
-    const pr=find(d.produk,it.produk_id); const qty=num(it.qty), hb=num(it.harga_beli||pr.harga_beli);
+    const pr=find(d.produk,it.produk_id);
+    if(!pr) throw new Error('Produk tidak ada di stok');
+    const qty=num(it.qty), hb=num(it.harga_beli!=null?it.harga_beli:pr.harga_beli);
     const sub=roundM(qty*hb); total+=sub;
     d.pembelianItem.push({id:uid('BI'),pembelian_id:id,produk_id:pr.id,nama_produk:pr.nama,qty,harga_beli:hb,subtotal:sub});
     pr.stok=roundQ(num(pr.stok)+qty); pr.harga_beli=hb;
@@ -2962,6 +2966,7 @@ function onBeliSupplier(){
   if(hint) hint.textContent=s?('Faktur untuk '+s.nama+' — barang supplier ini tampil di atas.'):'Pilih supplier.';
   fillBeliProduk();
   renderBeliItems();
+  isiNomorBeli();
 }
 function fillBeliProduk(){
   const sid=(document.getElementById('beliSupplier')||{}).value||'';
@@ -3033,6 +3038,7 @@ function renderBeliForm(){
   }
   onBeliSupplier();
   isiNomorBeli();
+  setTimeout(function(){ isiNomorBeli(); }, 0);
   renderBeliHist();
 }
 function addBeliItem(){
@@ -3068,25 +3074,35 @@ function renderBeliHist(){
   }).join('')||'<tr><td colspan="4" class="muted">Belum ada pembelian</td></tr>';
 }
 async function simpanPembelian(){
-  const sid=(document.getElementById('beliSupplier')||{}).value;
+  const sid=(document.getElementById('beliSupplier')||{}).value||'';
   if(!sid) return toast('Pilih supplier');
   if(!STATE.beli.length) return toast('Item faktur kosong');
+  isiNomorBeli();
+  const nomor=String((document.getElementById('beliNomor')||{}).value||'').trim() || nextNomorBeli();
+  const noEl=document.getElementById('beliNomor'); if(noEl) noEl.value=nomor;
+  const payload={supplier_id:sid,nomor:nomor,catatan:nomor,items:STATE.beli.slice()};
   try{
-    const nomor=String((document.getElementById('beliNomor')||{}).value||'').trim() || nextNomorBeli();
-    const res=await API('pembelian',{supplier_id:sid,nomor:nomor,catatan:nomor,items:STATE.beli});
-    if(useRemote()){
-      STATE.beli.forEach(function(it){
+    let res=null;
+    try{ res=await API('pembelian', payload); }catch(e1){ res=null; }
+    if(!res || !res.nomor){
+      res=localPembelian(payload);
+    }else if(useRemote()){
+      payload.items.forEach(function(it){
         const pr=find(STATE.data.produk,it.produk_id);
-        if(pr) pr.stok=roundQ(num(pr.stok)+num(it.qty));
+        if(pr){ pr.stok=roundQ(num(pr.stok)+num(it.qty)); if(it.harga_beli!=null) pr.harga_beli=num(it.harga_beli); }
       });
       STATE.data.pembelian=STATE.data.pembelian||[];
-      STATE.data.pembelian.unshift(res);
+      if(!find(STATE.data.pembelian, res.id)) STATE.data.pembelian.unshift(res);
       API('getProduk').then(function(p){ if(p) STATE.data.produk=p; }).catch(function(){});
     }
     STATE.beli=[];
-    const noEl=document.getElementById('beliNomor'); if(noEl) noEl.value='';
-    renderBeliForm(); renderStok(); toast('Faktur '+res.nomor+' · '+(find(STATE.data.supplier,sid)||{}).nama+' tersimpan');
-  }catch(e){ toast(e.message); }
+    if(noEl) noEl.value='';
+    isiNomorBeli(true);
+    renderBeliForm();
+    try{ renderStok(); }catch(e){}
+    try{ renderProdukKasir(); }catch(e){}
+    toast('Faktur '+res.nomor+' · '+(find(STATE.data.supplier,sid)||{}).nama+' tersimpan');
+  }catch(e){ toast(e.message||String(e)); }
 }
 
 /* ================= HUTANG ================= */
@@ -4731,7 +4747,7 @@ function cetakTutupKasir(){
 /* ================= HELPERS ================= */
 function modal(html){ const bg=document.getElementById('modalBg'); bg.classList.add('show'); bg.innerHTML='<div class="modal">'+html+'<div style="text-align:right;margin-top:8px"><button class="btn-ghost btn-sm" onclick="closeModal()">Tutup</button></div></div>'; }
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); document.getElementById('modalBg').innerHTML=''; }
-function val(id){ return document.getElementById(id).value; }
+function val(id){ const el=document.getElementById(id); return el?el.value:''; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 document.addEventListener('keydown',e=>{
@@ -4766,5 +4782,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a374314c9ba6fce6',t:'MTc4ODc2ODE2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3744403282ffd24',t:'MTc4ODc2ODkyNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
