@@ -11,6 +11,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
 (function(){
+  try{
+    var h=sessionStorage.getItem('warungpos_pending_html');
+    if(h && h.indexOf('APP_VERSION')>=0 && h.indexOf('(function boot()')>=0){
+      sessionStorage.removeItem('warungpos_pending_html');
+      document.open();
+      document.write(h);
+      document.close();
+      return;
+    }
+  }catch(e){}
   try{ if(localStorage.getItem('warungpos_session')) document.documentElement.classList.add('has-session'); }catch(e){}
   setTimeout(function(){
     var el=document.getElementById('bootSplash');
@@ -881,7 +891,7 @@ html.has-session .boot-splash{display:grid}
     <!-- UPDATE -->
     <div class="view" id="view-update">
       <div class="card">
-        <p class="hint">Pembaruan diunduh langsung dari GitHub (bukan cache halaman). Satu kali <b>Pasang</b> cukup. Jangan lewat script.google.com — URL /exec bisa jadi halaman putih.</p>
+        <p class="hint">Pembaruan diunduh dari GitHub, lalu dipasang di memori (bukan cache). Satu kali <b>Pasang</b> cukup. Jika versi tidak berganti, refresh paksa (Ctrl+Shift+R / tarik turun). Jangan lewat /exec.</p>
         <div class="dash" id="updKpi"></div>
         <p id="updNotes" class="hint"></p>
         <label class="fld">Repo GitHub</label>
@@ -910,7 +920,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.31';
+const APP_VERSION = '2026.09.06.32';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3992,10 +4002,13 @@ function htmlAppVersion(html){
 }
 async function fetchLatestIndexHtml(repo){
   var t=Date.now();
+  var pages='';
+  try{ pages=githubPagesUrl()+'index.html?t='+t; }catch(e){}
   var urls=[
-    {u:'https://api.github.com/repos/'+repo+'/contents/index.html?ref=main&_='+t, api:1},
-    {u:'https://raw.githubusercontent.com/'+repo+'/main/index.html?t='+t}
-  ];
+    {u:'https://raw.githubusercontent.com/'+repo+'/main/index.html?t='+t},
+    {u:pages},
+    {u:'https://api.github.com/repos/'+repo+'/contents/index.html?ref=main&_='+t, api:1}
+  ].filter(function(x){ return !!x.u; });
   var last=new Error('Tidak bisa unduh index.html');
   for(var i=0;i<urls.length;i++){
     try{
@@ -4032,6 +4045,7 @@ async function cekUpdate(quiet){
     var pas=document.getElementById('updPasangBtn');
     if(pas && !window._updLock) pas.textContent=newer?('Pasang '+info.version):'Pasang ulang';
     if(msg) msg.textContent=newer?('Versi baru '+info.version+' siap. Satu kali Pasang cukup.'):(quiet?'':'Aplikasi sudah versi terbaru.');
+    fetchLatestIndexHtml(repo).then(function(h){ window._updHtml=h; }).catch(function(){});
     return info;
   }catch(e){
     if(msg && !quiet) msg.textContent='Gagal cek: '+(e.message||e)+'. Ketuk Cek lagi.';
@@ -4050,11 +4064,38 @@ function onExecUrl(){
   try{ return /script\.google\.com\/macros\//.test(String(location.href||'')); }catch(e){ return false; }
 }
 function applyHtmlUpdate(html){
-  document.open('text/html');
+  html=String(html||'');
+  if(!looksLikeAppHtml(html)) throw new Error('File bukan aplikasi kasir');
+  document.open();
   document.write(html);
   document.close();
 }
-async function pasangUpdate(){
+function reloadBust(){
+  var href;
+  try{
+    if(onExecUrl() || onAppsScript()) href=githubPagesUrl()+'index.html?_wpv='+Date.now();
+    else {
+      var u=new URL(location.href);
+      u.searchParams.set('_wpv', String(Date.now()));
+      href=u.pathname+u.search;
+    }
+  }catch(e){ href=(location.pathname||'/')+'?_wpv='+Date.now(); }
+  location.replace(href);
+}
+function pasangHtmlNow(html, msg, unlock){
+  var ver=htmlAppVersion(html)||'baru';
+  if(msg) msg.textContent='Memasang versi '+ver+'…';
+  try{ sessionStorage.setItem('warungpos_pending_html', html); }catch(e){}
+  try{ applyHtmlUpdate(html); }catch(e){}
+  var now='';
+  try{ now=htmlAppVersion(document.documentElement.innerHTML); }catch(e){}
+  if(now && ver && now===ver && now!=='baru') return;
+  try{ reloadBust(); }catch(e){
+    if(msg) msg.textContent='Gagal pasang versi '+ver+'. Refresh paksa (Ctrl+Shift+R).';
+    if(unlock) unlock();
+  }
+}
+function pasangUpdate(){
   if(window._updLock) return;
   window._updLock=true;
   var msg=document.getElementById('updMsg');
@@ -4062,34 +4103,35 @@ async function pasangUpdate(){
   var cek=document.getElementById('updCekBtn');
   function unlock(){
     window._updLock=false;
-    if(btn){ btn.disabled=false; btn.textContent='Pasang sekarang'; }
+    if(btn){ btn.disabled=false; btn.textContent=(window._updRemote&&window._updRemote.version)?('Pasang '+window._updRemote.version):'Pasang sekarang'; }
     if(cek) cek.disabled=false;
   }
+  setTimeout(function(){ if(window._updLock) unlock(); }, 28000);
   if(btn){ btn.disabled=true; btn.textContent='Memasang…'; }
   if(cek) cek.disabled=true;
   var repo=updateRepo();
   try{ localStorage.setItem('warungpos_update_repo', repo); localStorage.setItem('warungpos_force_update', String(Date.now())); }catch(e){}
   if(onExecUrl() || onAppsScript()){
     if(msg) msg.textContent='Membuka GitHub Pages…';
-    location.replace(githubPagesUrl()+'index.html?v='+Date.now());
+    location.replace(githubPagesUrl()+'index.html?_wpv='+Date.now());
+    return;
+  }
+  var html=window._updHtml;
+  if(html && looksLikeAppHtml(html)){
+    pasangHtmlNow(html, msg, unlock);
     return;
   }
   if(msg) msg.textContent='Mengunduh dari GitHub…';
-  try{
-    var html=await fetchLatestIndexHtml(repo);
-    var ver=htmlAppVersion(html)||'baru';
-    if(msg) msg.textContent='Memasang versi '+ver+'…';
-    await new Promise(function(r){ setTimeout(r, 40); });
-    applyHtmlUpdate(html);
-  }catch(e){
+  fetchLatestIndexHtml(repo).then(function(h){
+    window._updHtml=h;
+    pasangHtmlNow(h, msg, unlock);
+  }).catch(function(e){
     if(msg) msg.textContent='Gagal unduh: '+(e.message||e)+'. Mencoba muat ulang…';
-    try{
-      location.replace(githubPagesUrl()+'index.html?v='+Date.now());
-    }catch(e2){
+    try{ reloadBust(); }catch(e2){
       if(msg) msg.textContent='Gagal pasang: '+(e.message||e)+'. Ketuk Pasang sekali lagi.';
       unlock();
     }
-  }
+  });
 }
 
 
@@ -5112,5 +5154,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37508913d44fce3',t:'MTc4ODc3Njk3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
