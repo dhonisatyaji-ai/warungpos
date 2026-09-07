@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.26",
+  "version": "2026.09.06.27",
   "tanggal": "2026-09-06",
-  "catatan": "Pembelian: produk baru, cari per supplier, SKU otomatis kategori, kolom barcode."
+  "catatan": "No. faktur pembelian terisi otomatis (PB-tanggal-urut)."
 }
