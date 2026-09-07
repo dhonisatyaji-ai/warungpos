@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.28",
+  "version": "2026.09.06.29",
   "tanggal": "2026-09-07",
-  "catatan": "No. faktur pembelian otomatis tampil. Simpan faktur tidak gagal meski cloud error."
+  "catatan": "Supplier kembar (huruf besar/kecil) digabung + tombol hapus. SKU ikut ganti kategori."
 }
