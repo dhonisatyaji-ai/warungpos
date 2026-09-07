@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.27",
-  "tanggal": "2026-09-06",
-  "catatan": "No. faktur pembelian terisi otomatis (PB-tanggal-urut)."
+  "version": "2026.09.06.28",
+  "tanggal": "2026-09-07",
+  "catatan": "No. faktur pembelian otomatis tampil. Simpan faktur tidak gagal meski cloud error."
 }
