@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.31",
+  "version": "2026.09.06.32",
   "tanggal": "2026-09-07",
-  "catatan": "User: centang menu yang boleh dibuka kasir (stok, beli, laporan, dll)."
+  "catatan": "Perbaiki tombol Pasang: Chrome memblokir document.write setelah unduh. Satu ketuk."
 }
