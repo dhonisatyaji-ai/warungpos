@@ -552,7 +552,7 @@ html.has-session .boot-splash{display:grid}
       <div class="card" style="margin-bottom:12px">
         <div class="two">
           <div><label class="fld">Supplier</label><select id="beliSupplier" onchange="onBeliSupplier()"></select></div>
-          <div><label class="fld">No. faktur / catatan</label><input id="beliCatatan" placeholder="Faktur supplier"></div>
+          <div><label class="fld">No. faktur</label><input id="beliNomor" placeholder="Otomatis" autocomplete="off"></div>
         </div>
         <p class="hint" id="beliSupHint">Pilih supplier di kartu atas atau di daftar.</p>
         <div class="toolbar" style="margin-top:10px">
@@ -877,7 +877,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.26';
+const APP_VERSION = '2026.09.06.27';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1652,10 +1652,31 @@ function localPenjualan(p){
   saveDB();
   return {id,nomor,tanggal,subtotal,diskon,total,bayar,kembalian,metode,pelanggan_id:pelangganId,items:outItems};
 }
+function nextNomorBeli(){
+  const d=todayStr().replace(/-/g,'');
+  const pre='PB-'+d+'-';
+  let max=0;
+  (STATE.data.pembelian||[]).forEach(function(b){
+    const n=String(b.nomor||'');
+    if(n.indexOf(pre)===0){
+      const k=parseInt(n.slice(pre.length),10);
+      if(k) max=Math.max(max, k);
+    }
+  });
+  return pre+String(max+1).padStart(3,'0');
+}
+function isiNomorBeli(){
+  const el=document.getElementById('beliNomor');
+  if(!el) return;
+  if(!el.value.trim()) el.value=nextNomorBeli();
+}
 function localPembelian(p){
   const d=STATE.data, items=p.items||[]; if(!items.length) throw new Error('Item kosong');
   if(!p.supplier_id) throw new Error('Supplier wajib');
-  let total=0; const id=uid('PB'), nomor='PB-'+Date.now();
+  let total=0; const id=uid('PB');
+  let nomor=String(p.nomor||'').trim() || nextNomorBeli();
+  const dup=(d.pembelian||[]).some(function(b){ return String(b.nomor||'')===nomor; });
+  if(dup) nomor=nextNomorBeli();
   items.forEach(it=>{
     const pr=find(d.produk,it.produk_id); const qty=num(it.qty), hb=num(it.harga_beli||pr.harga_beli);
     const sub=roundM(qty*hb); total+=sub;
@@ -3011,6 +3032,7 @@ function renderBeliForm(){
     fil.value=fv;
   }
   onBeliSupplier();
+  isiNomorBeli();
   renderBeliHist();
 }
 function addBeliItem(){
@@ -3050,7 +3072,8 @@ async function simpanPembelian(){
   if(!sid) return toast('Pilih supplier');
   if(!STATE.beli.length) return toast('Item faktur kosong');
   try{
-    const res=await API('pembelian',{supplier_id:sid,catatan:document.getElementById('beliCatatan').value,items:STATE.beli});
+    const nomor=String((document.getElementById('beliNomor')||{}).value||'').trim() || nextNomorBeli();
+    const res=await API('pembelian',{supplier_id:sid,nomor:nomor,catatan:nomor,items:STATE.beli});
     if(useRemote()){
       STATE.beli.forEach(function(it){
         const pr=find(STATE.data.produk,it.produk_id);
@@ -3060,7 +3083,8 @@ async function simpanPembelian(){
       STATE.data.pembelian.unshift(res);
       API('getProduk').then(function(p){ if(p) STATE.data.produk=p; }).catch(function(){});
     }
-    STATE.beli=[]; document.getElementById('beliCatatan').value='';
+    STATE.beli=[];
+    const noEl=document.getElementById('beliNomor'); if(noEl) noEl.value='';
     renderBeliForm(); renderStok(); toast('Faktur '+res.nomor+' · '+(find(STATE.data.supplier,sid)||{}).nama+' tersimpan');
   }catch(e){ toast(e.message); }
 }
@@ -4742,5 +4766,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3708f17bfbedf83',t:'MTc4ODczMDA1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a374314c9ba6fce6',t:'MTc4ODc2ODE2MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
