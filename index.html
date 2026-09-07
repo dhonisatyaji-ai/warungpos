@@ -43,7 +43,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 img{max-width:100%}
 .app-hidden{display:none!important}
-html.role-kasir .admin-only{display:none!important}
+html.role-kasir .admin-only:not(.akses-ok){display:none!important}
+html.role-kasir .nav-btn.akses-ok{display:flex!important}
+html.role-kasir .nav-fold-btn.akses-ok{display:flex!important}
+html.role-kasir .nav-fold.akses-ok.open{display:block!important}
+html.role-kasir .bottom-nav [data-view].akses-ok{display:flex!important}
 #login{min-height:100%;display:grid;place-items:center;padding:28px 20px;
   background:
     radial-gradient(900px 520px at 88% 112%,rgba(196,163,90,.16),transparent 55%),
@@ -189,6 +193,10 @@ th.col-aksi{background:#f6f0e6}
 td.col-aksi{background:var(--card)}
 tr:hover td.col-aksi{background:#fff7ed}
 td.col-aksi .btn{white-space:nowrap}
+.akses-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin:6px 0;max-height:220px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.akses-item{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;margin:0}
+.akses-item input{accent-color:var(--forest);flex:none}
+
 .barcode-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .blabel{width:170px;border:1px dashed var(--line);border-radius:8px;padding:8px 8px 6px;text-align:center;background:#fff;color:#111}
 .blabel .bl-toko{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
@@ -727,9 +735,9 @@ html.has-session .boot-splash{display:grid}
 
     <!-- USER -->
     <div class="view" id="view-user">
-      <p class="hint">Multi kasir: tiap orang punya akun sendiri. Jangan berbagi password. Role <b>kasir</b> untuk jaga toko, <b>admin</b> untuk atur harga, user, dan modal.</p>
+      <p class="hint">Multi kasir: tiap orang punya akun sendiri. Untuk kasir, centang menu yang boleh dibuka. Admin selalu membuka semua menu.</p>
       <div class="toolbar"><button class="btn" onclick="openUser()">+ User / kasir</button></div>
-      <div class="table-wrap"><table><thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody id="userBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Akses</th><th>Status</th><th></th></tr></thead><tbody id="userBody"></tbody></table></div>
     </div>
 
     <!-- TUTUP KASIR -->
@@ -902,7 +910,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.30';
+const APP_VERSION = '2026.09.06.31';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -932,7 +940,7 @@ function saveSession(){
   if (!STATE.user) return;
   try {
     localStorage.setItem(SESS_KEY, JSON.stringify({
-      user:{id:STATE.user.id, username:STATE.user.username, nama:STATE.user.nama, role:STATE.user.role, token:STATE.user.token||''},
+      user:{id:STATE.user.id, username:STATE.user.username, nama:STATE.user.nama, role:STATE.user.role, token:STATE.user.token||'', akses:STATE.user.akses||[]},
       backend:STATE.backend, view:STATE.view||'kasir', cart:STATE.cart||[], at:Date.now()
     }));
     if (STATE.user.username) localStorage.setItem('warungpos_last_user', STATE.user.username);
@@ -1484,7 +1492,7 @@ function localHandle(action, p){
       const u=d.user.find(x=>x.username.toLowerCase()===String(p.username).toLowerCase() && Number(x.aktif)===1);
       if(!u) throw new Error('User tidak ditemukan atau nonaktif');
       if(u.password!==hash(p.password) && u.password!==p.password) throw new Error('Password salah');
-      return {id:u.id,username:u.username,nama:u.nama,role:u.role,token:'local'};
+      return {id:u.id,username:u.username,nama:u.nama,role:u.role,token:'local',akses:u.akses||[]};
     }
     case 'dashboard':{
       const today=todayStr();
@@ -1751,13 +1759,55 @@ function localReturBeli(p){
 /* ================= UI SHELL ================= */
 const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],barcode:['Barcode','Cetak label tempel produk'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
 
+var AKSES_DEFAULT_KASIR=['dash','kasir','hutang','tutup','laporan'];
+var MENU_AKSES=[
+  {id:'dash',label:'Dashboard'},{id:'kasir',label:'Kasir'},{id:'stok',label:'Stok'},{id:'opname',label:'Stok opname'},
+  {id:'beli',label:'Pembelian'},{id:'hutang',label:'Hutang pelanggan'},{id:'returjual',label:'Retur penjualan'},{id:'returbeli',label:'Retur pembelian'},
+  {id:'kategori',label:'Kategori'},{id:'jenis',label:'Jenis'},{id:'supplier',label:'Supplier'},{id:'promo',label:'Promo'},{id:'barcode',label:'Barcode'},
+  {id:'laporan',label:'Laporan'},{id:'laba',label:'Laba'},{id:'arus',label:'Arus kas'},{id:'tutup',label:'Tutup kasir'},
+  {id:'user',label:'User'},{id:'printer',label:'Printer'},{id:'pengaturan',label:'Pengaturan'},{id:'update',label:'Update'}
+];
+function aksesList(user){
+  user=user||STATE.user;
+  if(!user) return [];
+  if(user.role==='admin') return MENU_AKSES.map(function(m){ return m.id; });
+  var a=user.akses;
+  if(typeof a==='string'){
+    try{ a=JSON.parse(a); }catch(e){ a=String(a).split(/[\s,]+/); }
+  }
+  if(!Array.isArray(a) || !a.length) return AKSES_DEFAULT_KASIR.slice();
+  return a.map(function(x){ return String(x); }).filter(Boolean);
+}
 function kasirBoleh(name){
   if(!STATE.user || STATE.user.role==='admin') return true;
-  return {dash:1,kasir:1,hutang:1,tutup:1,laporan:1}[name]===1;
+  return aksesList(STATE.user).indexOf(name)>=0;
+}
+function applyAkses(){
+  var admin=STATE.user && STATE.user.role==='admin';
+  document.documentElement.classList.toggle('role-kasir', !admin);
+  document.documentElement.classList.toggle('role-admin', !!admin);
+  document.querySelectorAll('.nav-btn[data-view], .bottom-nav [data-view]').forEach(function(b){
+    var v=b.getAttribute('data-view');
+    var ok=kasirBoleh(v);
+    b.classList.toggle('akses-ok', ok);
+    if(!b.classList.contains('admin-only')) b.style.display=ok?'':'none';
+  });
+  document.querySelectorAll('.nav-fold-btn').forEach(function(btn){
+    var id=btn.getAttribute('data-fold');
+    var fold=document.getElementById('fold-'+id);
+    var ok=!!admin;
+    if(fold){
+      fold.querySelectorAll('[data-view]').forEach(function(b){ if(kasirBoleh(b.getAttribute('data-view'))) ok=true; });
+      fold.classList.toggle('akses-ok', ok);
+    }
+    btn.classList.toggle('akses-ok', ok);
+    if(!btn.classList.contains('admin-only')) btn.style.display=ok?'':'none';
+  });
 }
 function showView(name){
   if(!TITLES[name] || !document.getElementById('view-'+name)) name='kasir';
-  if(!kasirBoleh(name)) name='kasir';
+  if(!kasirBoleh(name)) name=homeViewFor(STATE.user);
+  if(!kasirBoleh(name)) name=(aksesList()[0]||'kasir');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn,[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
@@ -2012,7 +2062,7 @@ function enterApp(user, note, view){
   document.getElementById('tokoNamaSide').textContent=(STATE.data.pengaturan&&STATE.data.pengaturan.toko_nama)||'WarungPOS';
   document.documentElement.classList.toggle('role-kasir', user.role!=='admin');
   document.documentElement.classList.toggle('role-admin', user.role==='admin');
-  document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = (user.role==='admin' ? '' : 'none'); });
+  applyAkses();
   startClock();
   saveSession();
   if (note) toast(note);
@@ -2020,7 +2070,11 @@ function enterApp(user, note, view){
   cekUpdate(true);
 }
 function homeViewFor(user){
-  return (user && user.role==='admin') ? 'dash' : 'kasir';
+  if(user && user.role==='admin') return 'dash';
+  var aks=aksesList(user);
+  if(aks.indexOf('kasir')>=0) return 'kasir';
+  if(aks.indexOf('dash')>=0) return 'dash';
+  return aks[0]||'kasir';
 }
 async function doLogin(){
   const err=document.getElementById('loginErr');
@@ -2092,6 +2146,14 @@ async function restoreSession(){
     STATE.view=sess.view||'kasir';
     if(Array.isArray(sess.cart)) STATE.cart=sess.cart;
     try{ STATE.data=loadDB(); }catch(e){}
+    try{
+      var full=find(STATE.data.user, STATE.user.id);
+      if(full){
+        STATE.user.nama=full.nama||STATE.user.nama;
+        STATE.user.role=full.role||STATE.user.role;
+        STATE.user.akses=full.akses||STATE.user.akses||[];
+      }
+    }catch(e){}
     enterApp(STATE.user, null, STATE.view);
   }catch(e){
     clearSession();
@@ -3792,20 +3854,61 @@ async function simpanKasLain(){
   }catch(e){ toast(e.message); }
 }
 function renderUser(){
-  document.getElementById('userBody').innerHTML=STATE.data.user.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.nama)+'</td><td>'+esc(u.role)+'</td><td>'+(Number(u.aktif)?'Aktif':'Nonaktif')+'</td><td><button class="btn-sm btn-ghost" onclick=\'openUser('+JSON.stringify(u.id)+')\'>Ubah</button></td></tr>').join('');
+  document.getElementById('userBody').innerHTML=STATE.data.user.map(function(u){
+    var hak=u.role==='admin'?'Semua':((u.akses&&u.akses.length)?(u.akses.length+' menu'):'Standar kasir');
+    return '<tr><td>'+esc(u.username)+'</td><td>'+esc(u.nama)+'</td><td>'+esc(u.role)+'</td><td>'+esc(hak)+'</td><td>'+(Number(u.aktif)?'Aktif':'Nonaktif')+'</td><td><button class="btn-sm btn-ghost" onclick=\'openUser('+JSON.stringify(u.id)+')\'>Ubah</button></td></tr>';
+  }).join('');
+}
+function htmlAksesBox(u){
+  u=u||{role:'kasir'};
+  var selected=(u.role==='admin')?MENU_AKSES.map(function(m){ return m.id; }):aksesList(u.akses&&u.akses.length?u:{role:'kasir',akses:AKSES_DEFAULT_KASIR});
+  var boxes=MENU_AKSES.map(function(m){
+    return '<label class="akses-item"><input type="checkbox" class="aksesCb" value="'+m.id+'"'+(selected.indexOf(m.id)>=0?' checked':'')+'> '+esc(m.label)+'</label>';
+  }).join('');
+  return '<div id="aksesWrap"'+(u.role==='admin'?' class="app-hidden"':'')+'><label class="fld">Menu yang boleh dibuka</label>'+
+    '<div class="row-btns" style="margin:4px 0 6px"><button type="button" class="btn-ghost btn-sm" onclick="aksesSet(\'all\')">Semua</button>'+
+    '<button type="button" class="btn-ghost btn-sm" onclick="aksesSet(\'kasir\')">Standar kasir</button></div>'+
+    '<div class="akses-grid">'+boxes+'</div><p class="hint">Kosong = hak standar kasir (dashboard, kasir, hutang, tutup, laporan).</p></div>';
+}
+function aksesSet(mode){
+  var ids=mode==='all'?MENU_AKSES.map(function(m){ return m.id; }):AKSES_DEFAULT_KASIR;
+  document.querySelectorAll('#modalBg .aksesCb').forEach(function(c){ c.checked=ids.indexOf(c.value)>=0; });
 }
 function openUser(id){
-  const u=id?find(STATE.data.user,id):{username:'',nama:'',role:'kasir'};
+  const u=id?find(STATE.data.user,id):{username:'',nama:'',role:'kasir',akses:AKSES_DEFAULT_KASIR.slice()};
   modal('<h3>User</h3><label class="fld">Username</label><input id="uUser" value="'+esc(u.username||'')+'"><label class="fld">Nama</label><input id="uNama" value="'+esc(u.nama||'')+'">'+
     '<label class="fld">Role</label><select id="uRole"><option value="admin">admin</option><option value="kasir">kasir</option></select>'+
     '<label class="fld">Password '+(id?'(kosongkan jika tidak diganti)':'')+'</label><input id="uPass" type="password">'+
+    htmlAksesBox(u)+
     '<button class="btn full" style="margin-top:10px" onclick=\'simpanUser('+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
-  setTimeout(()=>{ document.getElementById('uRole').value=u.role||'kasir'; },0);
+  setTimeout(function(){
+    var role=document.getElementById('uRole');
+    if(role){
+      role.value=u.role||'kasir';
+      role.onchange=function(){
+        var w=document.getElementById('aksesWrap');
+        if(w) w.classList.toggle('app-hidden', role.value==='admin');
+      };
+    }
+  },0);
 }
 async function simpanUser(id){
   const payload={id:id||undefined,username:val('uUser'),nama:val('uNama'),role:val('uRole'),aktif:1};
   const pw=val('uPass'); if(pw) payload.password=pw;
-  try{ await API('saveUser',payload); if(useRemote()) STATE.data.user=await API('getUsers'); closeModal(); renderUser(); toast('User disimpan'); }catch(e){ toast(e.message); }
+  var aks=[];
+  document.querySelectorAll('#modalBg .aksesCb:checked').forEach(function(c){ aks.push(c.value); });
+  payload.akses=(payload.role==='admin')?[]:aks;
+  try{
+    await API('saveUser',payload);
+    if(useRemote()) STATE.data.user=await API('getUsers');
+    if(STATE.user && id && String(STATE.user.id)===String(id)){
+      STATE.user.nama=payload.nama;
+      STATE.user.role=payload.role;
+      STATE.user.akses=payload.akses;
+      applyAkses(); saveSession();
+    }
+    closeModal(); renderUser(); toast('User disimpan');
+  }catch(e){ toast(e.message); }
 }
 function updateRepo(){
   try{
@@ -5009,5 +5112,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a374f3e74dd23ffa',t:'MTc4ODc3NjEzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37508913d44fce3',t:'MTc4ODc3Njk3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
