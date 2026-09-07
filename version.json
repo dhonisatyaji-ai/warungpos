@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.29",
+  "version": "2026.09.06.30",
   "tanggal": "2026-09-07",
-  "catatan": "Supplier kembar (huruf besar/kecil) digabung + tombol hapus. SKU ikut ganti kategori."
+  "catatan": "Promo ubah/hapus diperbaiki. Menu barcode: cetak label toko, produk, barcode, harga."
 }
