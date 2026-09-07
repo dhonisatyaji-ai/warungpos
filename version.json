@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.30",
+  "version": "2026.09.06.31",
   "tanggal": "2026-09-07",
-  "catatan": "Promo ubah/hapus diperbaiki. Menu barcode: cetak label toko, produk, barcode, harga."
+  "catatan": "User: centang menu yang boleh dibuka kasir (stok, beli, laporan, dll)."
 }
