@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.33",
+  "version": "2026.09.06.34",
   "tanggal": "2026-09-07",
-  "catatan": "Printer: tombol Validasi QZ Tray (izin Allow + daftar printer)."
+  "catatan": "Perbaiki splash Menyiapkan kasir tertahan. Tombol Buka layar masuk selalu ada."
 }
