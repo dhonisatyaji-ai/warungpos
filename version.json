@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.36",
+  "version": "2026.09.06.37",
   "tanggal": "2026-09-08",
-  "catatan": "QZ Tray: sertifikat WarungPOS + unduh override.crt agar Remember/Allow bisa diingat."
+  "catatan": "QZ: unggah kunci Site Manager agar Remember this decision bisa dicentang."
 }
