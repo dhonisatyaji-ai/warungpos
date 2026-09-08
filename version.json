@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.41",
+  "version": "2026.09.06.42",
   "tanggal": "2026-09-08",
-  "catatan": "Jurnal otomatis: penjualan, pembelian, retur, cicilan, kas. Buku besar & laba rugi."
+  "catatan": "Diskon keranjang: isi nominal dulu, lalu minta kode Authenticator admin. Tanpa password."
 }
