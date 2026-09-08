@@ -76,6 +76,7 @@ html.role-kasir .bottom-nav [data-view].akses-ok{display:flex!important}
 .hint{color:var(--muted);margin:0 0 18px;font-size:13px}
 label.fld{display:block;font-size:12px;font-weight:600;margin:12px 0 6px;color:#57534e}
 input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 12px;outline:none}
+input[type=checkbox],input[type=radio]{width:auto;height:auto;padding:0;margin:0;border:0;background:transparent;border-radius:0;box-shadow:none;accent-color:var(--forest)}
 input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:0 0 0 3px #1f5a4922}
 .btn{border:0;border-radius:12px;padding:11px 16px;font-weight:700;background:var(--forest);color:#fff}
 .btn:hover{filter:brightness(1.08)}
@@ -124,11 +125,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cart-acts .act-clear{background:var(--warn)}
 .cart-acts .draft-count{background:#fff;color:var(--sky)}
 .nota-pick{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
-  border-radius:12px;padding:10px 12px;margin:0 0 8px;cursor:pointer}
+  border-radius:12px;padding:10px 12px;margin:0 0 8px;cursor:pointer;color:var(--ink);box-sizing:border-box}
 .nota-pick:has(input:checked){border-color:var(--forest);background:#ecfdf5}
-.nota-pick input{margin-top:3px;accent-color:var(--forest);flex:none}
-.nota-pick b{display:block}
-.nota-pick .muted{font-size:12px}
+.nota-pick input[type=radio]{margin-top:4px;flex:none;width:18px;height:18px}
+.nota-pick .nota-body{flex:1;min-width:0;color:var(--ink)}
+.nota-pick b{display:block;color:var(--ink);font-weight:800}
+.nota-pick .muted{display:block;font-size:12px;color:var(--muted)!important;opacity:1}
 .draft-count{display:inline-block;min-width:16px;background:#c4a35a;color:#1c1917;font-size:10px;font-weight:800;
   border-radius:999px;padding:0 6px;margin-left:4px;line-height:16px;text-align:center}
 .draft-row{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
@@ -935,7 +937,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.37';
+const APP_VERSION = '2026.09.06.38';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -4783,6 +4785,16 @@ function ringkasItemPj(id){
   if(names.length<=2) return names.join(', ');
   return names.slice(0,2).join(', ')+' +'+(names.length-2);
 }
+function notaNomor(p){
+  return String((p&&(p.nomor||p.no_nota||p.kode||p.id))||'-');
+}
+function notaJam(p){
+  var t=String((p&&(p.tanggal||p.created_at||p.waktu))||'');
+  var jam=t.slice(11,16);
+  if(/^\d{2}:\d{2}$/.test(jam)) return jam;
+  var m=t.match(/(\d{2}:\d{2})/);
+  return m?m[1]:(t.slice(0,10)||'');
+}
 function bukaCetakUlangHariIni(){
   const list=transaksiHariIni();
   if(!list.length) return toast('Belum ada transaksi hari ini');
@@ -4790,14 +4802,16 @@ function bukaCetakUlangHariIni(){
   const rows=list.map(function(p,i){
     const st=String(p.status||'');
     const met=st==='batal'?'Batal':(metodeLabel(p.metode)||'Selesai');
-    const jam=esc(String(p.tanggal||'').slice(11,16));
+    const jam=notaJam(p);
     const id=String(p.id||p.nomor||'');
+    const nomor=notaNomor(p);
     if(!first && st!=='batal') first=id;
     if(!first && i===0) first=id;
-    const ring=ringkasItemPj(p.id);
+    const ring=ringkasItemPj(p.id)||ringkasItemPj(p.nomor);
     const chk=id===first?' checked':'';
+    const tot=p.total!=null?p.total:(p.grand_total||p.jumlah||0);
     return '<label class="nota-pick"><input type="radio" name="notaPick" value="'+esc(id)+'"'+chk+'>'+
-      '<span><b>'+esc(p.nomor)+'</b><span class="muted">'+(jam?jam+' · ':'')+esc(met)+' · '+rp(p.total)+
+      '<span class="nota-body"><b>'+esc(nomor)+'</b><span class="muted">'+esc((jam?jam+' · ':'')+met+' · '+rp(tot))+
       (ring?('<br>'+esc(ring)):'')+'</span></span></label>';
   }).join('');
   modal('<h3>Cetak ulang</h3><p class="hint">Pilih nota hari ini, lalu ketuk Cetak.</p>'+rows+
@@ -5338,5 +5352,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37b10221e4aea82',t:'MTc4ODg0MDIwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37cfd3b7815f8f8',t:'MTc4ODg2MDM5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
