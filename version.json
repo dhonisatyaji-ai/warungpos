@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.32",
+  "version": "2026.09.06.33",
   "tanggal": "2026-09-07",
-  "catatan": "Perbaiki tombol Pasang: Chrome memblokir document.write setelah unduh. Satu ketuk."
+  "catatan": "Printer: tombol Validasi QZ Tray (izin Allow + daftar printer)."
 }
