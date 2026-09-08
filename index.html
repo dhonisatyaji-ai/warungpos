@@ -793,16 +793,23 @@ html.has-session .boot-splash{display:grid}
       <p class="hint">Struk/nota dan laporan bisa printer berbeda. QZ Tray mencetak langsung tanpa dialog browser.</p>
       <div class="card" style="margin-bottom:12px">
         <h3 style="margin:0 0 6px">QZ Tray</h3>
-        <p class="hint">1) Pasang <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a> di komputer kasir. 2) Buka aplikasi QZ Tray. 3) Hubungkan, lalu pilih printer. Saat muncul izin, pilih Always allow untuk situs ini.</p>
+        <ol class="hint" style="margin:0 0 10px;padding-left:18px">
+          <li>Pasang <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a> di komputer kasir (Windows/Mac/Linux — bukan HP).</li>
+          <li>Jalankan QZ Tray. Ikon di taskbar harus aktif (bukan abu-abu).</li>
+          <li>Ketuk <b>Validasi QZ Tray</b>. Saat jendela QZ muncul: centang <b>Remember this decision</b>, lalu <b>Allow</b>.</li>
+          <li>Pilih printer struk/laporan, <b>Simpan printer</b>, lalu Tes cetak.</li>
+        </ol>
         <label class="fld">Cara cetak</label>
         <select id="prtMode">
           <option value="browser">Dialog browser</option>
           <option value="qz">QZ Tray (langsung ke printer)</option>
         </select>
         <p id="qzStatus" class="hint">Status: belum terhubung</p>
+        <div id="qzValidBox" class="akses-grid" style="display:none;margin-top:8px"></div>
         <div class="row-btns" style="margin-top:10px">
-          <button class="btn" type="button" onclick="hubungQz()">Hubungkan QZ Tray</button>
-          <button class="btn-ghost" type="button" onclick="muatPrinterQz()">Muat daftar printer</button>
+          <button class="btn" type="button" onclick="validasiQz()">Validasi QZ Tray</button>
+          <button class="btn-ghost" type="button" onclick="hubungQz()">Hubungkan</button>
+          <button class="btn-ghost" type="button" onclick="muatPrinterQz()">Muat printer</button>
         </div>
       </div>
       <div class="two">
@@ -920,7 +927,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.32';
+const APP_VERSION = '2026.09.06.33';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -4170,6 +4177,61 @@ function ensureQzLib(){
     return window.qz;
   });
 }
+function qzErrMsg(e){
+  var s=String((e&&(e.message||e))||e||'Gagal');
+  if(/denied|blocked|untrusted|invalid certificate|not allowed|cancelled|canceled|User rejected/i.test(s))
+    return 'Izin QZ ditolak. Di jendela QZ Tray: centang Remember this decision, lalu Allow.';
+  if(/connect|websocket|refused|Unable to establish|timed out|ECONNREFUSED|Failed to connect/i.test(s))
+    return 'QZ Tray belum jalan. Buka QZ Tray di komputer ini, tunggu ikon tray, lalu Validasi lagi.';
+  return s;
+}
+function qzVersion(){
+  try{
+    var v=qz.api && qz.api.getVersion && qz.api.getVersion();
+    if(v && typeof v.then==='function') return v;
+    return Promise.resolve(v||'');
+  }catch(e){ return Promise.resolve(''); }
+}
+function isiQzValid(rows){
+  var box=document.getElementById('qzValidBox');
+  if(!box) return;
+  box.style.display='grid';
+  box.innerHTML=rows.map(function(r){
+    return '<label class="akses-item">'+(r.ok?'✓':'✗')+' '+esc(r.t)+'</label>';
+  }).join('');
+}
+function validasiQz(){
+  setQzStatus('Status: memvalidasi…');
+  isiQzValid([{ok:0,t:'Menghubungkan ke QZ Tray…'}]);
+  ensureQzLib().then(function(){
+    if(qzAktif()) return;
+    return qz.websocket.connect({ retries: 8, delay: 1 });
+  }).then(function(){
+    return Promise.all([qzVersion(), qz.printers.find()]);
+  }).then(function(res){
+    var ver=res[0]||'', list=[].concat(res[1]||[]);
+    var sNama=((document.getElementById('prtSNama')||{}).value||'').trim();
+    var lNama=((document.getElementById('prtLNama')||{}).value||'').trim();
+    isiPilihQz('prtSQz', sNama, list);
+    isiPilihQz('prtLQz', lNama, list);
+    var mode=document.getElementById('prtMode');
+    if(mode) mode.value='qz';
+    var rows=[
+      {ok:1, t:'QZ Tray terhubung'+(ver?(' · v'+ver):'')},
+      {ok:list.length>0, t:list.length? (list.length+' printer: '+list.slice(0,4).join(', ')+(list.length>4?'…':'')) : 'Belum ada printer. Pasang driver printer di Windows.'},
+      {ok:!sNama || list.indexOf(sNama)>=0, t:sNama? ('Printer struk: '+sNama+(list.indexOf(sNama)>=0?' (ada)':' — nama tidak cocok, pilih dari daftar')) : 'Printer struk belum dipilih'},
+      {ok:1, t:'Situs ini sudah diizinkan. Pilih printer, Simpan printer, lalu Tes cetak.'}
+    ];
+    isiQzValid(rows);
+    setQzStatus('Status: terhubung'+(ver?(' · v'+ver):'')+' · '+list.length+' printer');
+    toast(list.length? 'QZ Tray valid. Pilih printer lalu tes cetak.' : 'QZ terhubung, printer belum terdeteksi.');
+  }).catch(function(e){
+    var m=qzErrMsg(e);
+    isiQzValid([{ok:0,t:m}]);
+    setQzStatus('Status: gagal validasi');
+    toast(m);
+  });
+}
 function hubungQz(){
   setQzStatus('Status: menghubungkan…');
   ensureQzLib().then(function(){
@@ -4180,8 +4242,9 @@ function hubungQz(){
     toast('QZ Tray terhubung');
     return muatPrinterQz();
   }).catch(function(e){
-    setQzStatus('Status: gagal — pasang dan jalankan QZ Tray');
-    toast('QZ Tray belum siap. Pasang dari qz.io/download lalu buka aplikasinya. '+(e&&(e.message||e)||''));
+    var m=qzErrMsg(e);
+    setQzStatus('Status: gagal — '+m);
+    toast(m);
   });
 }
 function muatPrinterQz(){
@@ -5154,5 +5217,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ab4e2fe6bdf78',t:'MTc4ODgzNjQ2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
