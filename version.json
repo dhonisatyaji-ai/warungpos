@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.39",
+  "version": "2026.09.06.40",
   "tanggal": "2026-09-08",
-  "catatan": "Cetak ulang: pilih nota sampai 1 bulan (hari ini / 7 hari / 1 bulan / tanggal)."
+  "catatan": "Diskon kasir wajib otorisasi admin (Authenticator 6 angka atau password admin)."
 }
