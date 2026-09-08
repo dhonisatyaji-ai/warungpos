@@ -11,24 +11,25 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>
 (function(){
-  try{
-    var h=sessionStorage.getItem('warungpos_pending_html');
-    if(h && h.indexOf('APP_VERSION')>=0 && h.indexOf('(function boot()')>=0){
-      sessionStorage.removeItem('warungpos_pending_html');
-      document.open();
-      document.write(h);
-      document.close();
-      return;
-    }
-  }catch(e){}
+  window.bootGiveUp=function(){
+    try{ sessionStorage.removeItem('warungpos_pending_html'); }catch(e){}
+    try{ localStorage.removeItem('warungpos_session'); }catch(e){}
+    try{ document.documentElement.classList.remove('has-session'); }catch(e){}
+    var el=document.getElementById('bootSplash'); if(el){ el.classList.add('hide'); el.classList.add('show-out'); }
+    var app=document.getElementById('app'); if(app) app.classList.add('app-hidden');
+    var login=document.getElementById('login'); if(login) login.classList.remove('app-hidden');
+  };
+  try{ sessionStorage.removeItem('warungpos_pending_html'); }catch(e){}
   try{ if(localStorage.getItem('warungpos_session')) document.documentElement.classList.add('has-session'); }catch(e){}
   setTimeout(function(){
     var el=document.getElementById('bootSplash');
+    if(el && !el.classList.contains('hide')) el.classList.add('show-out');
+  }, 1200);
+  setTimeout(function(){
+    var el=document.getElementById('bootSplash');
     if(!el || el.classList.contains('hide')) return;
-    el.classList.add('hide');
-    document.documentElement.classList.remove('has-session');
-    var login=document.getElementById('login'); if(login) login.classList.remove('app-hidden');
-  }, 2500);
+    window.bootGiveUp();
+  }, 4000);
 })();
 </script>
 <style>
@@ -320,10 +321,10 @@ hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}
 .op-ttd .garis{margin-top:48px;border-top:1px solid #1c1917;padding-top:6px}
 .boot-splash{display:none;position:fixed;inset:0;z-index:120;background:#0f2a24;color:#ecfdf5;
   place-items:center;text-align:center;font-weight:600;letter-spacing:.02em}
-html.has-session .boot-splash{display:grid}
+html.has-session .boot-splash:not(.hide){display:grid}
 .upd-dot{margin-left:6px;background:#c4a35a;color:#1c1917;font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;letter-spacing:.02em}
 .boot-splash.hide{display:none!important}
-.boot-splash .boot-out{display:none;margin-top:18px;background:transparent;border:1px solid rgba(232,201,122,.45);color:#e8c97a;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:700}
+.boot-splash .boot-out{display:inline-block;margin-top:18px;background:transparent;border:1px solid rgba(232,201,122,.45);color:#e8c97a;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:700}
 .boot-splash.show-out .boot-out{display:inline-block}
 .boot-splash .boot-mark{width:56px;height:56px;border-radius:16px;background:#143d32;display:grid;place-items:center;margin:0 auto 14px;border:1px solid rgba(232,201,122,.35)}
 .boot-splash small{display:block;margin-top:8px;color:#a7f3d0;font-weight:500;font-size:12px}
@@ -927,7 +928,7 @@ html.has-session .boot-splash{display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.33';
+const APP_VERSION = '2026.09.06.34';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1826,7 +1827,9 @@ function showView(name){
   if(!kasirBoleh(name)) name=homeViewFor(STATE.user);
   if(!kasirBoleh(name)) name=(aksesList()[0]||'kasir');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  var pane=document.getElementById('view-'+name);
+  if(!pane){ name='kasir'; pane=document.getElementById('view-kasir'); }
+  if(pane) pane.classList.add('active');
   document.querySelectorAll('.nav-btn,[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
   document.getElementById('viewTitle').textContent=TITLES[name][0];
   document.getElementById('viewSub').textContent=TITLES[name][1];
@@ -2069,22 +2072,30 @@ async function loadRemoteAll(){
   STATE.data.hutang=STATE.data.hutang||[];
 }
 function enterApp(user, note, view){
-  STATE.user=user;
-  document.documentElement.classList.add('has-session');
-  hideSplash();
-  document.getElementById('login').classList.add('app-hidden');
-  document.getElementById('app').classList.remove('app-hidden');
-  document.getElementById('sideUserName').textContent=user.nama;
-  document.getElementById('sideUserRole').innerHTML='<span class="role-dot"></span>'+roleLabel(user.role);
-  document.getElementById('tokoNamaSide').textContent=(STATE.data.pengaturan&&STATE.data.pengaturan.toko_nama)||'WarungPOS';
-  document.documentElement.classList.toggle('role-kasir', user.role!=='admin');
-  document.documentElement.classList.toggle('role-admin', user.role==='admin');
-  applyAkses();
-  startClock();
-  saveSession();
-  if (note) toast(note);
-  showView(view || STATE.view || homeViewFor(user));
-  cekUpdate(true);
+  try{
+    STATE.user=user;
+    document.documentElement.classList.add('has-session');
+    hideSplash();
+    var login=document.getElementById('login'); if(login) login.classList.add('app-hidden');
+    var app=document.getElementById('app'); if(app) app.classList.remove('app-hidden');
+    var nm=document.getElementById('sideUserName'); if(nm) nm.textContent=(user&&user.nama)||'';
+    var rl=document.getElementById('sideUserRole'); if(rl) rl.innerHTML='<span class="role-dot"></span>'+roleLabel(user&&user.role);
+    var tk=document.getElementById('tokoNamaSide');
+    if(tk) tk.textContent=((STATE.data&&STATE.data.pengaturan&&STATE.data.pengaturan.toko_nama)||'WarungPOS');
+    document.documentElement.classList.toggle('role-kasir', !user || user.role!=='admin');
+    document.documentElement.classList.toggle('role-admin', !!(user && user.role==='admin'));
+    try{ applyAkses(); }catch(e){}
+    try{ startClock(); }catch(e){}
+    try{ saveSession(); }catch(e){}
+    if (note) try{ toast(note); }catch(e){}
+    try{ showView(view || STATE.view || homeViewFor(user)); }catch(e){}
+    try{ cekUpdate(true); }catch(e){}
+  }catch(e){
+    try{ hideSplash(); }catch(e2){}
+    throw e;
+  }finally{
+    hideSplash();
+  }
 }
 function homeViewFor(user){
   if(user && user.role==='admin') return 'dash';
@@ -2148,9 +2159,10 @@ function armSplashEscape(){
     if(!el || el.classList.contains('hide')) return;
     el.classList.add('show-out');
     if(STATE.user){
-      try{ enterApp(STATE.user, null, STATE.view||'kasir'); }catch(e){ hideSplash(); }
+      try{ enterApp(STATE.user, null, STATE.view||'kasir'); return; }catch(e){}
     }
-  }, 8000);
+    try{ bootGiveUp(); }catch(e){ hideSplash(); }
+  }, 5000);
 }
 async function restoreSession(){
   fillLastUser();
@@ -2173,8 +2185,7 @@ async function restoreSession(){
     }catch(e){}
     enterApp(STATE.user, null, STATE.view);
   }catch(e){
-    clearSession();
-    hideSplash();
+    try{ bootGiveUp(); }catch(e2){ clearSession(); hideSplash(); }
     fillLastUser();
     return;
   }
@@ -5217,5 +5228,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ab4e2fe6bdf78',t:'MTc4ODgzNjQ2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ac0ca58b640c2',t:'MTc4ODgzNjk1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
