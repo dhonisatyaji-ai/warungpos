@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.37",
+  "version": "2026.09.06.38",
   "tanggal": "2026-09-08",
-  "catatan": "QZ: unggah kunci Site Manager agar Remember this decision bisa dicentang."
+  "catatan": "Cetak ulang: nomor, jam, metode, total tampil (radio tidak menelan teks)."
 }
