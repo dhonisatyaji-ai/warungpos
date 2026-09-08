@@ -19,7 +19,20 @@
     var app=document.getElementById('app'); if(app) app.classList.add('app-hidden');
     var login=document.getElementById('login'); if(login) login.classList.remove('app-hidden');
   };
-  try{ sessionStorage.removeItem('warungpos_pending_html'); }catch(e){}
+  try{
+    var pend=sessionStorage.getItem('warungpos_pending_html')||'';
+    if(pend.length>20000 && pend.indexOf('APP_VERSION')>=0 && pend.indexOf('(function boot()')>=0){
+      document.open();
+      document.write(pend);
+      document.close();
+      try{ sessionStorage.removeItem('warungpos_pending_html'); }catch(e2){}
+      try{
+        var vm=pend.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+        if(vm) sessionStorage.setItem('warungpos_just_applied', vm[1]+'|'+Date.now());
+      }catch(e2){}
+      return;
+    }
+  }catch(e){}
   try{ if(localStorage.getItem('warungpos_session')) document.documentElement.classList.add('has-session'); }catch(e){}
   setTimeout(function(){
     var el=document.getElementById('bootSplash');
@@ -967,15 +980,11 @@ html.has-session .boot-splash:not(.hide){display:grid}
     <!-- UPDATE -->
     <div class="view" id="view-update">
       <div class="card">
-        <p class="hint">Pembaruan diunduh dari GitHub, lalu dipasang di memori (bukan cache). Satu kali <b>Pasang</b> cukup. Jika versi tidak berganti, refresh paksa (Ctrl+Shift+R / tarik turun). Jangan lewat /exec.</p>
+        <p class="hint">Pembaruan otomatis dari GitHub setiap login atau refresh. Tidak perlu cek atau pasang manual. Jangan lewat /exec.</p>
         <div class="dash" id="updKpi"></div>
         <p id="updNotes" class="hint"></p>
         <label class="fld">Repo GitHub</label>
-        <input id="updRepo" placeholder="username/warungpos" autocomplete="off">
-        <div class="row-btns" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" type="button" id="updCekBtn" onclick="cekUpdate(false)">Cek pembaruan</button>
-          <button class="btn-gold" type="button" id="updPasangBtn" onclick="pasangUpdate()">Pasang sekarang</button>
-        </div>
+        <input id="updRepo" placeholder="username/warungpos" autocomplete="off" onchange="simpanUpdateRepo()">
         <p id="updMsg" class="hint" style="margin-top:10px"></p>
       </div>
     </div>
@@ -996,7 +1005,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.42';
+const APP_VERSION = '2026.09.06.43';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2163,7 +2172,7 @@ function toggleJurnalDet(id){
 }
 
 /* ================= UI SHELL ================= */
-const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],barcode:['Barcode','Cetak label tempel produk'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],jurnal:['Jurnal','Otomatis dari jual, beli, kas'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
+const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],barcode:['Barcode','Cetak label tempel produk'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],jurnal:['Jurnal','Otomatis dari jual, beli, kas'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Otomatis saat login atau refresh']};
 
 var AKSES_DEFAULT_KASIR=['dash','kasir','hutang','tutup','laporan'];
 var MENU_AKSES=[
@@ -2478,7 +2487,7 @@ function enterApp(user, note, view){
     try{ saveSession(); }catch(e){}
     if (note) try{ toast(note); }catch(e){}
     try{ showView(view || STATE.view || homeViewFor(user)); }catch(e){}
-    try{ cekUpdate(true); }catch(e){}
+    try{ autoUpdateMulai(); }catch(e){}
   }catch(e){
     try{ hideSplash(); }catch(e2){}
     throw e;
@@ -4458,6 +4467,11 @@ function updateRepo(){
   }catch(e){}
   return String(window.WARUNGPOS_UPDATE_REPO||CONFIG.UPDATE_REPO||'dhonisatyaji-ai/warungpos').trim();
 }
+function simpanUpdateRepo(){
+  var repo=updateRepo();
+  try{ localStorage.setItem('warungpos_update_repo', repo); }catch(e){}
+  autoUpdateMulai();
+}
 function renderUpdate(){
   var repo=updateRepo();
   var el=document.getElementById('updRepo'); if(el && !el.value) el.value=repo;
@@ -4465,7 +4479,22 @@ function renderUpdate(){
   if(kpi) kpi.innerHTML=
     '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
     '<div class="dstat"><span>Repo</span><b style="font-size:13px">'+esc(repo)+'</b></div>';
-  cekUpdate(true);
+  var msg=document.getElementById('updMsg');
+  if(msg && !msg.textContent) msg.textContent='Pembaruan dipasang otomatis saat login atau refresh.';
+  autoUpdateMulai();
+}
+function tampilUpdateKpi(info){
+  var newer=info && cmpVer(info.version, APP_VERSION)>0;
+  var dot=document.getElementById('updDot');
+  if(dot) dot.classList.toggle('app-hidden', !newer);
+  var notes=document.getElementById('updNotes');
+  if(notes) notes.textContent=(info && info.catatan)?('Catatan: '+info.catatan):'';
+  var kpi=document.getElementById('updKpi');
+  if(kpi) kpi.innerHTML=
+    '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
+    '<div class="dstat"><span>Versi GitHub</span><b class="'+(newer?'ok-txt':'')+'">'+(info&&info.version?esc(info.version):'-')+'</b></div>'+
+    '<div class="dstat"><span>Status</span><b class="'+(newer?'ok-txt':'')+'">'+(newer?'Ada pembaruan — dipasang otomatis':'Sudah yang terbaru')+'</b></div>';
+  return !!newer;
 }
 function b64Utf8(s){
   s=String(s||'').replace(/\s/g,'');
@@ -4504,8 +4533,8 @@ async function readGithubFile(r, api){
 async function fetchVersionJson(repo){
   var t=Date.now();
   var urls=[
-    {u:'https://api.github.com/repos/'+repo+'/contents/version.json?ref=main&_='+t, api:1},
-    {u:'https://raw.githubusercontent.com/'+repo+'/main/version.json?t='+t}
+    {u:'https://raw.githubusercontent.com/'+repo+'/main/version.json?t='+t},
+    {u:'https://api.github.com/repos/'+repo+'/contents/version.json?ref=main&_='+t, api:1}
   ];
   var last=new Error('Tidak bisa cek pembaruan');
   for(var i=0;i<urls.length;i++){
@@ -4551,37 +4580,60 @@ async function fetchLatestIndexHtml(repo){
   }
   throw last;
 }
-async function cekUpdate(quiet){
+function autoUpdateMulai(){
+  if(window._updLock) return window._updAutoP;
+  try{
+    var ja=String(sessionStorage.getItem('warungpos_just_applied')||'').split('|');
+    if(ja[0]===APP_VERSION && (Date.now()-Number(ja[1]||0))<20000){
+      tampilUpdateKpi(window._updRemote||{version:APP_VERSION});
+      return;
+    }
+  }catch(e){}
+  if(window._updAutoP) return window._updAutoP;
+  window._updAutoP=autoPasangJikaBaru().finally(function(){ window._updAutoP=null; });
+  return window._updAutoP;
+}
+async function autoPasangJikaBaru(){
   var msg=document.getElementById('updMsg');
-  var notes=document.getElementById('updNotes');
-  var dot=document.getElementById('updDot');
-  var cek=document.getElementById('updCekBtn');
   var repo=updateRepo();
   try{ localStorage.setItem('warungpos_update_repo', repo); }catch(e){}
-  if(cek) cek.disabled=true;
-  if(msg && !quiet) msg.textContent='Mengecek GitHub…';
   try{
     var info=await fetchVersionJson(repo);
     window._updRemote=info;
-    var newer=cmpVer(info.version, APP_VERSION)>0;
-    if(dot) dot.classList.toggle('app-hidden', !newer);
-    if(notes) notes.textContent=info.catatan?('Catatan: '+info.catatan):'';
-    var kpi=document.getElementById('updKpi');
-    if(kpi) kpi.innerHTML=
-      '<div class="dstat"><span>Versi terpasang</span><b>'+esc(APP_VERSION)+'</b></div>'+
-      '<div class="dstat"><span>Versi GitHub</span><b class="'+(newer?'ok-txt':'')+'">'+esc(info.version)+'</b></div>'+
-      '<div class="dstat"><span>Status</span><b class="'+(newer?'ok-txt':'')+'">'+(newer?'Ada pembaruan':'Sudah yang terbaru')+'</b></div>';
-    var pas=document.getElementById('updPasangBtn');
-    if(pas && !window._updLock) pas.textContent=newer?('Pasang '+info.version):'Pasang ulang';
-    if(msg) msg.textContent=newer?('Versi baru '+info.version+' siap. Satu kali Pasang cukup.'):(quiet?'':'Aplikasi sudah versi terbaru.');
-    fetchLatestIndexHtml(repo).then(function(h){ window._updHtml=h; }).catch(function(){});
+    var newer=tampilUpdateKpi(info);
+    if(!newer){
+      if(msg) msg.textContent='Aplikasi sudah versi terbaru.';
+      return info;
+    }
+    if(msg) msg.textContent='Mengunduh versi '+info.version+'…';
+    if(onExecUrl() || onAppsScript()){
+      location.replace(githubPagesUrl()+'index.html?_wpv='+Date.now());
+      return info;
+    }
+    window._updLock=true;
+    var html=window._updHtml;
+    var hv=html?htmlAppVersion(html):'';
+    if(!html || !looksLikeAppHtml(html) || cmpVer(hv, APP_VERSION)<=0){
+      html=await fetchLatestIndexHtml(repo);
+      window._updHtml=html;
+    }
+    var ver=htmlAppVersion(html);
+    if(!ver || cmpVer(ver, APP_VERSION)<=0){
+      window._updLock=false;
+      if(msg) msg.textContent='Berkas GitHub belum versi baru. Dipakai versi terpasang.';
+      try{ sessionStorage.setItem('warungpos_just_applied', APP_VERSION+'|'+Date.now()); }catch(e){}
+      return info;
+    }
+    pasangHtmlNow(html, msg, function(){ window._updLock=false; });
     return info;
   }catch(e){
-    if(msg && !quiet) msg.textContent='Gagal cek: '+(e.message||e)+'. Ketuk Cek lagi.';
+    window._updLock=false;
+    if(msg) msg.textContent='Cek pembaruan gagal. Dipakai versi terpasang.';
     return null;
-  }finally{
-    if(cek) cek.disabled=false;
   }
+}
+async function cekUpdate(quiet){
+  return autoUpdateMulai();
 }
 function githubPagesUrl(){
   var repo=updateRepo();
@@ -4615,52 +4667,24 @@ function pasangHtmlNow(html, msg, unlock){
   var ver=htmlAppVersion(html)||'baru';
   if(msg) msg.textContent='Memasang versi '+ver+'…';
   try{ sessionStorage.setItem('warungpos_pending_html', html); }catch(e){}
+  try{ if(ver && ver!=='baru') sessionStorage.setItem('warungpos_just_applied', ver+'|'+Date.now()); }catch(e){}
   try{ applyHtmlUpdate(html); }catch(e){}
   var now='';
   try{ now=htmlAppVersion(document.documentElement.innerHTML); }catch(e){}
-  if(now && ver && now===ver && now!=='baru') return;
+  if(now && ver && now===ver && now!=='baru'){
+    try{ sessionStorage.removeItem('warungpos_pending_html'); }catch(e){}
+    return;
+  }
   try{ reloadBust(); }catch(e){
     if(msg) msg.textContent='Gagal pasang versi '+ver+'. Refresh paksa (Ctrl+Shift+R).';
     if(unlock) unlock();
   }
 }
 function pasangUpdate(){
-  if(window._updLock) return;
-  window._updLock=true;
-  var msg=document.getElementById('updMsg');
-  var btn=document.getElementById('updPasangBtn');
-  var cek=document.getElementById('updCekBtn');
-  function unlock(){
-    window._updLock=false;
-    if(btn){ btn.disabled=false; btn.textContent=(window._updRemote&&window._updRemote.version)?('Pasang '+window._updRemote.version):'Pasang sekarang'; }
-    if(cek) cek.disabled=false;
-  }
-  setTimeout(function(){ if(window._updLock) unlock(); }, 28000);
-  if(btn){ btn.disabled=true; btn.textContent='Memasang…'; }
-  if(cek) cek.disabled=true;
-  var repo=updateRepo();
-  try{ localStorage.setItem('warungpos_update_repo', repo); localStorage.setItem('warungpos_force_update', String(Date.now())); }catch(e){}
-  if(onExecUrl() || onAppsScript()){
-    if(msg) msg.textContent='Membuka GitHub Pages…';
-    location.replace(githubPagesUrl()+'index.html?_wpv='+Date.now());
-    return;
-  }
-  var html=window._updHtml;
-  if(html && looksLikeAppHtml(html)){
-    pasangHtmlNow(html, msg, unlock);
-    return;
-  }
-  if(msg) msg.textContent='Mengunduh dari GitHub…';
-  fetchLatestIndexHtml(repo).then(function(h){
-    window._updHtml=h;
-    pasangHtmlNow(h, msg, unlock);
-  }).catch(function(e){
-    if(msg) msg.textContent='Gagal unduh: '+(e.message||e)+'. Mencoba muat ulang…';
-    try{ reloadBust(); }catch(e2){
-      if(msg) msg.textContent='Gagal pasang: '+(e.message||e)+'. Ketuk Pasang sekali lagi.';
-      unlock();
-    }
-  });
+  try{ sessionStorage.removeItem('warungpos_just_applied'); }catch(e){}
+  window._updLock=false;
+  window._updAutoP=null;
+  autoUpdateMulai();
 }
 
 
@@ -5962,6 +5986,7 @@ STATE.data=loadDB();
   } catch(e) {}
   armSplashEscape();
   restoreSession();
+  try{ autoUpdateMulai(); }catch(e){}
   try{
     if(location.search && /(?:^|[?&])v=/.test(location.search) && history.replaceState){
       history.replaceState(null, '', location.pathname+(location.hash||''));
@@ -5969,5 +5994,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37dc91ceaeaeba1',t:'MTc4ODg2ODc1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ddb8b6f3d5fd2',t:'MTc4ODg2OTUwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
