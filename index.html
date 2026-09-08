@@ -131,6 +131,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .nota-pick .nota-body{flex:1;min-width:0;color:var(--ink)}
 .nota-pick b{display:block;color:var(--ink);font-weight:800}
 .nota-pick .muted{display:block;font-size:12px;color:var(--muted)!important;opacity:1}
+.nota-list{max-height:min(46vh,360px);overflow:auto;margin:8px 0 4px;-webkit-overflow-scrolling:touch}
+.nota-tgl{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;margin:10px 2px 6px}
+.cu-chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.cu-chips .btn-sm{padding:6px 10px}
+.cu-chips .on{background:var(--forest);color:#fff;border-color:var(--forest)}
 .draft-count{display:inline-block;min-width:16px;background:#c4a35a;color:#1c1917;font-size:10px;font-weight:800;
   border-radius:999px;padding:0 6px;margin-left:4px;line-height:16px;text-align:center}
 .draft-row{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
@@ -937,7 +942,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.38';
+const APP_VERSION = '2026.09.06.39';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -4795,29 +4800,137 @@ function notaJam(p){
   var m=t.match(/(\d{2}:\d{2})/);
   return m?m[1]:(t.slice(0,10)||'');
 }
-function bukaCetakUlangHariIni(){
-  const list=transaksiHariIni();
-  if(!list.length) return toast('Belum ada transaksi hari ini');
-  let first='';
-  const rows=list.map(function(p,i){
-    const st=String(p.status||'');
-    const met=st==='batal'?'Batal':(metodeLabel(p.metode)||'Selesai');
-    const jam=notaJam(p);
-    const id=String(p.id||p.nomor||'');
-    const nomor=notaNomor(p);
+function tglGeser(iso, n){
+  var p=String(iso||todayStr()).slice(0,10).split('-');
+  var d=new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+  d.setDate(d.getDate()+Number(n)||0);
+  var z=function(x){ return String(x).padStart(2,'0'); };
+  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+}
+function notaTgl(p){
+  return String((p&&(p.tanggal||p.created_at||p.waktu))||'').slice(0,10);
+}
+function transaksiPeriode(dari, sampai){
+  var min=tglGeser(todayStr(), -31);
+  var max=todayStr();
+  dari=String(dari||max).slice(0,10);
+  sampai=String(sampai||max).slice(0,10);
+  if(dari<min) dari=min;
+  if(sampai>max) sampai=max;
+  if(dari>sampai){ var x=dari; dari=sampai; sampai=x; }
+  var list=(STATE.data.penjualan||[]).filter(function(p){
+    var t=notaTgl(p);
+    return t>=dari && t<=sampai;
+  });
+  if(STATE.user && STATE.user.role!=='admin'){
+    list=list.filter(function(p){ return String(p.user_id||'')===String(STATE.user.id||''); });
+  }
+  list.sort(function(a,b){ return String(b.tanggal||b.created_at||'').localeCompare(String(a.tanggal||a.created_at||'')); });
+  return list;
+}
+function htmlBarisNota(list){
+  if(!list.length) return '<p class="hint">Tidak ada nota di rentang ini.</p>';
+  var first='', last='', html='';
+  list.forEach(function(p,i){
+    var st=String(p.status||'');
+    var met=st==='batal'?'Batal':(metodeLabel(p.metode)||'Selesai');
+    var jam=notaJam(p);
+    var tgl=notaTgl(p);
+    var id=String(p.id||p.nomor||'');
+    var nomor=notaNomor(p);
     if(!first && st!=='batal') first=id;
     if(!first && i===0) first=id;
-    const ring=ringkasItemPj(p.id)||ringkasItemPj(p.nomor);
-    const chk=id===first?' checked':'';
-    const tot=p.total!=null?p.total:(p.grand_total||p.jumlah||0);
-    return '<label class="nota-pick"><input type="radio" name="notaPick" value="'+esc(id)+'"'+chk+'>'+
+    var ring=ringkasItemPj(p.id)||ringkasItemPj(p.nomor);
+    var tot=p.total!=null?p.total:(p.grand_total||p.jumlah||0);
+    if(tgl && tgl!==last){
+      html+='<div class="nota-tgl">'+esc(tgl)+'</div>';
+      last=tgl;
+    }
+    html+='<label class="nota-pick"><input type="radio" name="notaPick" value="'+esc(id)+'"'+(id===first?' checked':'')+'>'+
       '<span class="nota-body"><b>'+esc(nomor)+'</b><span class="muted">'+esc((jam?jam+' · ':'')+met+' · '+rp(tot))+
       (ring?('<br>'+esc(ring)):'')+'</span></span></label>';
-  }).join('');
-  modal('<h3>Cetak ulang</h3><p class="hint">Pilih nota hari ini, lalu ketuk Cetak.</p>'+rows+
+  });
+  return html;
+}
+function cuDariSampai(){
+  var min=tglGeser(todayStr(), -31), max=todayStr();
+  var dari=(document.getElementById('cuDari')||{}).value||max;
+  var sampai=(document.getElementById('cuSampai')||{}).value||max;
+  dari=String(dari).slice(0,10); sampai=String(sampai).slice(0,10);
+  if(dari<min) dari=min;
+  if(sampai>max) sampai=max;
+  return {dari:dari, sampai:sampai, min:min, max:max};
+}
+function setCuPeriode(mode){
+  var max=todayStr();
+  var dari=max;
+  if(mode==='7') dari=tglGeser(max, -6);
+  else if(mode==='30') dari=tglGeser(max, -30);
+  var a=document.getElementById('cuDari'), b=document.getElementById('cuSampai');
+  if(a) a.value=dari;
+  if(b) b.value=max;
+  document.querySelectorAll('#modalBg .cu-chips [data-cu]').forEach(function(x){
+    x.classList.toggle('on', x.getAttribute('data-cu')===mode);
+  });
+  isiDaftarCetakUlang();
+}
+function isiDaftarCetakUlang(){
+  var box=document.getElementById('cuList'); if(!box) return;
+  var r=cuDariSampai();
+  var q=String((document.getElementById('cuCari')||{}).value||'').trim().toLowerCase();
+  var list=transaksiPeriode(r.dari, r.sampai);
+  if(q){
+    list=list.filter(function(p){
+      var blob=(notaNomor(p)+' '+(p.metode||'')+' '+(ringkasItemPj(p.id)||'')).toLowerCase();
+      return blob.indexOf(q)>=0;
+    });
+  }
+  box.innerHTML=htmlBarisNota(list);
+}
+function gabungPenjualan(rows){
+  if(!Array.isArray(rows)||!rows.length) return;
+  STATE.data.penjualan=STATE.data.penjualan||[];
+  var by={};
+  STATE.data.penjualan.forEach(function(p){ if(p&&p.id) by[String(p.id)]=p; });
+  rows.forEach(function(p){ if(p&&p.id) by[String(p.id)]=Object.assign({}, by[String(p.id)]||{}, p); });
+  var out=[];
+  Object.keys(by).forEach(function(k){ out.push(by[k]); });
+  STATE.data.penjualan=out;
+}
+function muatNotaSebulan(){
+  if(typeof API!=='function') return;
+  var dari=tglGeser(todayStr(), -30);
+  Promise.resolve(API('getPenjualan', {from:dari, to:todayStr()})).then(function(rows){
+    gabungPenjualan(rows);
+    if(document.getElementById('cuList')) isiDaftarCetakUlang();
+  }).catch(function(){});
+}
+function bukaCetakUlangHariIni(){
+  var max=todayStr(), min=tglGeser(max, -31);
+  modal('<h3>Cetak ulang</h3><p class="hint">Nota sampai 1 bulan terakhir. Pilih lalu Cetak.</p>'+
+    '<div class="cu-chips">'+
+      '<button type="button" class="btn-ghost btn-sm on" data-cu="hari">Hari ini</button>'+
+      '<button type="button" class="btn-ghost btn-sm" data-cu="7">7 hari</button>'+
+      '<button type="button" class="btn-ghost btn-sm" data-cu="30">1 bulan</button>'+
+    '</div>'+
+    '<div class="two"><div><label class="fld">Dari</label><input type="date" id="cuDari" value="'+max+'" min="'+min+'" max="'+max+'"></div>'+
+    '<div><label class="fld">Sampai</label><input type="date" id="cuSampai" value="'+max+'" min="'+min+'" max="'+max+'"></div></div>'+
+    '<label class="fld">Cari</label><input id="cuCari" placeholder="Nomor nota atau nama item" autocomplete="off">'+
+    '<div class="nota-list" id="cuList"></div>'+
     '<button type="button" class="btn btn-gold full" id="btnCetakNotaPilih">Cetak</button>');
-  const go=document.getElementById('btnCetakNotaPilih');
+  document.querySelectorAll('#modalBg .cu-chips [data-cu]').forEach(function(b){
+    b.addEventListener('click', function(){ setCuPeriode(b.getAttribute('data-cu')); });
+  });
+  ['cuDari','cuSampai'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('change', isiDaftarCetakUlang);
+  });
+  var cari=document.getElementById('cuCari');
+  if(cari) cari.addEventListener('input', isiDaftarCetakUlang);
+  var go=document.getElementById('btnCetakNotaPilih');
   if(go) go.addEventListener('click', function(e){ e.preventDefault(); cetakNotaTerpilih(); });
+  isiDaftarCetakUlang();
+  muatNotaSebulan();
 }
 function cetakNotaTerpilih(){
   const el=document.querySelector('#modalBg input[name="notaPick"]:checked');
@@ -5352,5 +5465,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37cfd3b7815f8f8',t:'MTc4ODg2MDM5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37d108f2e5bdf9b',t:'MTc4ODg2MTE5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
