@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.34",
-  "tanggal": "2026-09-07",
-  "catatan": "Perbaiki splash Menyiapkan kasir tertahan. Tombol Buka layar masuk selalu ada."
+  "version": "2026.09.06.36",
+  "tanggal": "2026-09-08",
+  "catatan": "QZ Tray: sertifikat WarungPOS + unduh override.crt agar Remember/Allow bisa diingat."
 }
