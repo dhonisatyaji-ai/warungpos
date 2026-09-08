@@ -309,6 +309,9 @@ td.col-aksi .btn{white-space:nowrap}
 .struk .nom{display:grid;grid-template-columns:1.7em 8em;column-gap:4px;flex:none;font-weight:inherit}
 .struk .nom .rp{text-align:left}
 .struk .nom .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.struk .kv{display:grid;grid-template-columns:13ch 1fr;align-items:start}
+.struk .kv .k{white-space:nowrap}
+.struk .kv .v{min-width:0;word-break:break-word}
 .muted{color:var(--muted)}
 .danger-txt{color:var(--danger);font-weight:700}
 .ok-txt{color:var(--ok);font-weight:700}
@@ -1005,7 +1008,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.43';
+const APP_VERSION = '2026.09.06.44';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3342,6 +3345,14 @@ async function prosesBayar(){
   }catch(e){ toast(e.message); }
   finally { window._bayarLock=false; }
 }
+function strukWaktu(t){
+  t=String(t==null?'':t).replace('T',' ').replace(/Z$/,'');
+  if(t.length>=16) return t.slice(0,16);
+  return t||'-';
+}
+function strukKv(k,v){
+  return '<div class="kv"><span class="k">'+esc(k)+'</span><span class="v"> : '+esc(v==null||v===''?'-':v)+'</span></div>';
+}
 function buatStrukHtml(res){
   const set=STATE.data.pengaturan||{};
   const pl=find(STATE.data.pelanggan,res.pelanggan_id);
@@ -3370,7 +3381,11 @@ function buatStrukHtml(res){
     pay=met;
   }
   return '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
-    '<hr class="dashline">'+(String(res.status)==='batal'?'<div><b>BATAL</b></div>':'')+esc(res.nomor)+'<br>'+esc(res.tanggal)+'<br>Kasir: '+esc((find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'')+'<br>Pelanggan: '+esc(pl?pl.nama:'-')+
+    '<hr class="dashline">'+(String(res.status)==='batal'?'<div><b>BATAL</b></div>':'')+
+    strukKv('No.inv', res.nomor)+
+    strukKv('Tanggal/waktu', strukWaktu(res.tanggal))+
+    strukKv('Kasir', (find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'')+
+    strukKv('Pelanggan', pl?pl.nama:'-')+
     '<hr class="dashline">'+items+
     '<hr class="dashline">'+sr('Subtotal', rpKolom(res.subtotal))+
     (num(res.diskon)?sr('Diskon / promo', rpKolom(res.diskon)):'')+
@@ -3430,6 +3445,9 @@ function printDokumen(kind, html){
     '.struk .nom{display:grid;grid-template-columns:1.7em 8em;column-gap:4px;flex:none;font-weight:inherit}'+
     '.struk .nom .rp{text-align:left}'+
     '.struk .nom .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'+
+    '.struk .kv{display:grid;grid-template-columns:13ch 1fr;align-items:start}'+
+    '.struk .kv .k{white-space:nowrap}'+
+    '.struk .kv .v{min-width:0;word-break:break-word}'+
     'hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}'+
     '.op-ttd{display:flex;justify-content:space-between;gap:12px;margin-top:28px;text-align:center;font-size:12px}'+
     '.op-ttd div{flex:1}.op-ttd .garis{margin-top:48px;border-top:1px solid #111;padding-top:6px}'+
@@ -5994,5 +6012,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ddb8b6f3d5fd2',t:'MTc4ODg2OTUwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37de8c16adc9a58',t:'MTc4ODg3MDA0Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
