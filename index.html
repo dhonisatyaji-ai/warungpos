@@ -524,8 +524,9 @@ html.has-session .boot-splash:not(.hide){display:grid}
             <div><span>Subtotal</span><span id="tSub">Rp 0</span></div>
             <div id="tPromoRow" class="app-hidden"><span>Promo</span><span id="tPromo" class="num-in">− Rp 0</span></div>
             <div><span>Diskon</span><span style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
-              <select id="diskonMode" onchange="renderCart()" style="width:72px;display:inline-block"><option value="rp">Rp</option><option value="pct">%</option></select>
-              <input id="diskonKasir" type="number" min="0" step="any" value="0" style="width:88px;display:inline-block" oninput="renderCart()">
+              <button type="button" class="btn-ghost btn-sm app-hidden" id="btnDiskonAuth" onclick="bukaOtorisasiDiskon()">Minta admin</button>
+              <select id="diskonMode" onchange="onDiskonKasirUbah()" style="width:72px;display:inline-block"><option value="rp">Rp</option><option value="pct">%</option></select>
+              <input id="diskonKasir" type="number" min="0" step="any" value="0" style="width:88px;display:inline-block" oninput="onDiskonKasirUbah()">
             </span></div>
             <div id="diskonKetRow" class="app-hidden"><span></span><span id="diskonKet" class="muted"></span></div>
             <div class="grand"><span>Total</span><span id="tGrand">Rp 0</span></div>
@@ -897,7 +898,18 @@ html.has-session .boot-splash:not(.hide){display:grid}
         <p class="hint">Opsional (Supabase). Kosongkan = data tersimpan di HP/laptop ini, transaksi langsung tanpa loading Google.</p>
         <label class="fld">URL Apps Script (opsional, lambat)</label>
         <input id="setGasUrl" placeholder="Kosongkan jika pakai GitHub + data lokal/Supabase" autocomplete="off">
-        <button class="btn" onclick="simpanPengaturan()">Simpan pengaturan</button>
+        <hr style="border:0;border-top:1px dashed var(--line);margin:16px 0">
+        <h3 style="margin:0 0 6px;font-size:16px">Otorisasi diskon</h3>
+        <p class="hint">Kasir tidak bisa ubah diskon sendiri. Minta kode 6 angka ke admin (Google Authenticator / Authy) atau password akun admin.</p>
+        <label class="fld" style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" id="setDiskonAuth"> Kasir wajib minta admin untuk diskon</label>
+        <div id="totpBox" style="margin-top:10px">
+          <img id="totpQr" alt="QR Authenticator" style="width:160px;height:160px;background:#fff;border:1px solid var(--line);border-radius:12px;display:none">
+          <p class="hint" id="totpSecretHint">Kunci Authenticator belum dibuat.</p>
+          <div class="row-btns">
+            <button class="btn-ghost" type="button" onclick="buatTotpBaru()">Buat / ganti kunci Authenticator</button>
+          </div>
+        </div>
+        <button class="btn" onclick="simpanPengaturan()" style="margin-top:12px">Simpan pengaturan</button>
         <hr style="border:0;border-top:1px dashed var(--line);margin:16px 0">
         <h3 style="margin:0 0 6px;font-size:16px">Cadangan data</h3>
         <p class="hint">Unduh file JSON ke HP/laptop. Pulihkan jika ganti perangkat atau data terhapus. Tidak mengganti aplikasi, hanya data toko.</p>
@@ -942,7 +954,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.39';
+const APP_VERSION = '2026.09.06.40';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -962,7 +974,7 @@ function applySb(url, key){
 
 const LS_KEY = 'warungpos_db_v1';
 const SESS_KEY = 'warungpos_session';
-const STATE = { user:null, cat:'semua', cart:[], beli:[], data:null, backend:'local', view:'kasir' };
+const STATE = { user:null, cat:'semua', cart:[], beli:[], data:null, backend:'local', view:'kasir', diskonAuthOk:false };
 function roleLabel(r){ return r==='admin' ? 'Administrator' : 'Kasir'; }
 function hideSplash(){ var el=document.getElementById('bootSplash'); if(el) el.classList.add('hide'); }
 function readSession(){
@@ -1040,6 +1052,50 @@ function rpKolom(n, bold){
 function roundM(n){ return Math.round((num(n)+Number.EPSILON)*100)/100; }
 function roundQ(n){ return Math.round((num(n)+Number.EPSILON)*10000)/10000; }
 function hash(s){ /* demo hash */ let h=0; s=String(s); for(let i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0; return 'h'+Math.abs(h); }
+var B32ALPH='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function b32enc(bytes){
+  var out='', bits=0, val=0, i;
+  for(i=0;i<bytes.length;i++){ val=(val<<8)|bytes[i]; bits+=8; while(bits>=5){ out+=B32ALPH[(val>>>(bits-5))&31]; bits-=5; } }
+  if(bits>0) out+=B32ALPH[(val<<(5-bits))&31];
+  return out;
+}
+function b32dec(s){
+  s=String(s||'').toUpperCase().replace(/[^A-Z2-7]/g,'');
+  var bits=0, val=0, arr=[], i, idx;
+  for(i=0;i<s.length;i++){ idx=B32ALPH.indexOf(s[i]); if(idx<0) continue; val=(val<<5)|idx; bits+=5; if(bits>=8){ arr.push((val>>>(bits-8))&255); bits-=8; } }
+  return new Uint8Array(arr);
+}
+function totpSecretBaru(){
+  var u=new Uint8Array(20);
+  try{ crypto.getRandomValues(u); }catch(e){ for(var i=0;i<20;i++) u[i]=(Math.random()*256)&255; }
+  return b32enc(u);
+}
+function totpNow(secret, at){
+  var key=b32dec(secret);
+  if(!key.length) return Promise.resolve('');
+  var t=Math.floor((at||Date.now())/30000);
+  var buf=new ArrayBuffer(8), v=new DataView(buf);
+  v.setUint32(0, Math.floor(t/0x100000000));
+  v.setUint32(4, t>>>0);
+  return crypto.subtle.importKey('raw', key, {name:'HMAC', hash:'SHA-1'}, false, ['sign']).then(function(k){
+    return crypto.subtle.sign('HMAC', k, buf);
+  }).then(function(sig){
+    var u=new Uint8Array(sig), off=u[19]&0xf;
+    var bin=((u[off]&0x7f)<<24)|(u[off+1]<<16)|(u[off+2]<<8)|u[off+3];
+    return ('000000'+String(bin%1000000)).slice(-6);
+  });
+}
+function totpCocok(secret, code){
+  code=String(code||'').replace(/\s/g,'');
+  if(!/^\d{6}$/.test(code) || !secret) return Promise.resolve(false);
+  var now=Date.now(), i, checks=[];
+  for(i=-1;i<=1;i++) checks.push(totpNow(secret, now+i*30000));
+  return Promise.all(checks).then(function(arr){ return arr.indexOf(code)>=0; });
+}
+function totpOtpauth(secret){
+  var toko=((STATE.data&&STATE.data.pengaturan&&STATE.data.pengaturan.toko_nama)||'WarungPOS');
+  return 'otpauth://totp/'+encodeURIComponent('WarungPOS:'+toko)+'?secret='+encodeURIComponent(secret)+'&issuer=WarungPOS&period=30&digits=6';
+}
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2400); }
 function byId(id){ return STATE.data[id==='Kategori'?'kategori':id==='Jenis'?'jenis':id==='Supplier'?'supplier':id==='Pelanggan'?'pelanggan':id==='Produk'?'produk':id==='User'?'user':id==='Penjualan'?'penjualan':id==='PenjualanItem'?'penjualanItem':id==='Pembelian'?'pembelian':id==='PembelianItem'?'pembelianItem':id==='ReturPenjualan'?'returJual':id==='ReturPenjualanItem'?'returJualItem':id==='ReturPembelian'?'returBeli':id==='ReturPembelianItem'?'returBeliItem':id==='Hutang'?'hutang':'pengaturan']; }
 
@@ -2579,12 +2635,104 @@ function renderCart(){
   if(ketRow) ketRow.classList.toggle('app-hidden', tot.diskonMode!=='pct' || !tot.diskonManual);
   if(ket) ket.textContent=(tot.diskonMode==='pct')?('= '+rp(tot.diskonManual)):'';
   syncCartCount();
+  try{ syncDiskonLock(); }catch(e){}
   if(STATE.user) saveSession();
+}
+function butuhOtorisasiDiskon(){
+  if(STATE.user && STATE.user.role==='admin') return false;
+  var p=(STATE.data&&STATE.data.pengaturan)||{};
+  if(p.diskon_auth===0 || p.diskon_auth==='0') return false;
+  return true;
+}
+function syncDiskonLock(){
+  var lock=butuhOtorisasiDiskon() && !STATE.diskonAuthOk;
+  var el=document.getElementById('diskonKasir');
+  var md=document.getElementById('diskonMode');
+  if(el){ el.readOnly=!!lock; el.style.opacity=lock?.7:1; }
+  if(md) md.disabled=!!lock;
+  var btn=document.getElementById('btnDiskonAuth');
+  if(btn) btn.classList.toggle('app-hidden', !lock);
+}
+function onDiskonKasirUbah(){
+  var el=document.getElementById('diskonKasir');
+  var v=num(el&&el.value);
+  if(v<=0){ STATE.diskonAuthOk=false; renderCart(); return; }
+  if(!butuhOtorisasiDiskon() || STATE.diskonAuthOk){ renderCart(); return; }
+  STATE._diskonPending={mode:(document.getElementById('diskonMode')||{}).value, val:el.value};
+  el.value=0;
+  renderCart();
+  bukaOtorisasiDiskon();
+}
+function bukaOtorisasiDiskon(){
+  var p=(STATE.data&&STATE.data.pengaturan)||{};
+  var adaTotp=!!(p.totp_secret);
+  modal('<h3>Otorisasi diskon</h3><p class="hint">Minta admin. Isi kode Authenticator 6 angka, atau password akun admin.</p>'+
+    (adaTotp?'<label class="fld">Kode Authenticator</label><input id="authTotp" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">':'<p class="hint">Authenticator belum diatur. Pakai password admin, atau admin buka Pengaturan → Buat kunci Authenticator.</p>')+
+    '<label class="fld">Password admin</label><input id="authAdmPass" type="password" autocomplete="off" placeholder="Password akun admin">'+
+    '<button type="button" class="btn full" style="margin-top:10px" id="btnIzinkanDiskon">Izinkan diskon</button>');
+  var go=document.getElementById('btnIzinkanDiskon');
+  if(go) go.addEventListener('click', function(e){ e.preventDefault(); izinkanDiskon(); });
+  setTimeout(function(){ var a=document.getElementById('authTotp')||document.getElementById('authAdmPass'); if(a) a.focus(); }, 50);
+}
+function izinkanDiskon(){
+  var code=val('authTotp');
+  var pw=val('authAdmPass');
+  var p=(STATE.data&&STATE.data.pengaturan)||{};
+  var done=function(ok){
+    if(!ok) return toast('Kode atau password admin salah');
+    STATE.diskonAuthOk=true;
+    var pend=STATE._diskonPending||{};
+    var md=document.getElementById('diskonMode'); if(md && pend.mode) md.value=pend.mode;
+    var el=document.getElementById('diskonKasir'); if(el && pend.val!=null) el.value=pend.val;
+    closeModal();
+    renderCart();
+    toast('Admin mengizinkan diskon');
+  };
+  if(code && p.totp_secret){
+    totpCocok(p.totp_secret, code).then(function(ok){
+      if(ok) return done(true);
+      done(cekPasswordAdmin(pw));
+    });
+    return;
+  }
+  done(cekPasswordAdmin(pw));
+}
+function cekPasswordAdmin(pw){
+  pw=String(pw||'');
+  if(!pw) return false;
+  var h=hash(pw);
+  return (STATE.data.user||[]).some(function(u){
+    return u.role==='admin' && Number(u.aktif)===1 && (u.password===h || u.password===pw);
+  });
+}
+function tampilTotpQr(secret){
+  var img=document.getElementById('totpQr');
+  var hint=document.getElementById('totpSecretHint');
+  if(!secret){
+    if(img) img.style.display='none';
+    if(hint) hint.textContent='Kunci Authenticator belum dibuat.';
+    return;
+  }
+  var url=totpOtpauth(secret);
+  if(img){
+    img.style.display='block';
+    img.onerror=function(){ img.style.display='none'; };
+    img.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(url);
+  }
+  if(hint) hint.innerHTML='Kunci: <b>'+esc(secret)+'</b> — scan QR di Google Authenticator, atau ketik kunci manual.';
+}
+function buatTotpBaru(){
+  var secret=totpSecretBaru();
+  persistPengaturan({totp_secret:secret, diskon_auth:1});
+  var au=document.getElementById('setDiskonAuth'); if(au) au.checked=true;
+  tampilTotpQr(secret);
+  toast('Kunci baru. Scan QR di HP admin, simpan pengaturan.');
 }
 function chgQty(i,d){ STATE.cart[i].qty=Math.max(1, num(STATE.cart[i].qty)+d); renderCart(); }
 function delCart(i){ STATE.cart.splice(i,1); renderCart(); }
 function clearCart(){
-  STATE.cart=[]; document.getElementById('diskonKasir').value=0; document.getElementById('catatanKasir').value='';
+  STATE.cart=[]; STATE.diskonAuthOk=false; STATE._diskonPending=null;
+  document.getElementById('diskonKasir').value=0; document.getElementById('catatanKasir').value='';
   const dm=document.getElementById('diskonMode'); if(dm) dm.value='rp';
   renderCart();
   renderPelangganSelect(false);
@@ -4581,6 +4729,9 @@ function renderPengaturan(){
   var gEl=document.getElementById('setGasUrl');
   if(gEl){ try{ gEl.value=localStorage.getItem('warungpos_gas_url')||''; }catch(e){ gEl.value=''; } }
   tampilQrisPreview();
+  var au=document.getElementById('setDiskonAuth');
+  if(au) au.checked=s.diskon_auth!==0 && s.diskon_auth!=='0';
+  tampilTotpQr(s.totp_secret);
 }
 async function simpanPengaturan(){
   var urlEl=document.getElementById('setSbUrl');
@@ -4595,7 +4746,10 @@ async function simpanPengaturan(){
     else localStorage.removeItem('warungpos_gas_url');
     window.WARUNGPOS_GAS_URL=gu;
   }catch(e){}
-  const payload={toko_nama:document.getElementById('setNama').value,toko_telp:document.getElementById('setTelp').value,toko_alamat:document.getElementById('setAlamat').value,toko_footer:document.getElementById('setFooter').value};
+  const payload={toko_nama:document.getElementById('setNama').value,toko_telp:document.getElementById('setTelp').value,toko_alamat:document.getElementById('setAlamat').value,toko_footer:document.getElementById('setFooter').value,
+    diskon_auth:(document.getElementById('setDiskonAuth')&&document.getElementById('setDiskonAuth').checked)?1:0};
+  var cur=(STATE.data&&STATE.data.pengaturan)||{};
+  if(cur.totp_secret) payload.totp_secret=cur.totp_secret;
   persistPengaturan(payload);
   var side=document.getElementById('tokoNamaSide'); if(side) side.textContent=payload.toko_nama||'WarungPOS';
   try{
@@ -5465,5 +5619,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37d108f2e5bdf9b',t:'MTc4ODg2MTE5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37d209488d3df9f',t:'MTc4ODg2MTg0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
