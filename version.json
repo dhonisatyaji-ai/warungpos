@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.38",
+  "version": "2026.09.06.39",
   "tanggal": "2026-09-08",
-  "catatan": "Cetak ulang: nomor, jam, metode, total tampil (radio tidak menelan teks)."
+  "catatan": "Cetak ulang: pilih nota sampai 1 bulan (hari ini / 7 hari / 1 bulan / tanggal)."
 }
