@@ -795,13 +795,17 @@ html.has-session .boot-splash:not(.hide){display:grid}
       <div class="card" style="margin-bottom:12px">
         <h3 style="margin:0 0 6px">QZ Tray</h3>
         <ol class="hint" style="margin:0 0 10px;padding-left:18px">
-          <li>Pasang <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a> di komputer kasir (bukan HP), lalu jalankan sampai ikon taskbar aktif.</li>
-          <li>Ketuk <b>Unduh override.crt</b>. Salin file itu ke <code>C:\Program Files\QZ Tray\override.crt</code> (ganti jika sudah ada). Perlu izin Administrator.</li>
-          <li>Klik kanan ikon QZ Tray → <b>Exit</b>, lalu buka QZ Tray lagi.</li>
-          <li>Ketuk <b>Validasi QZ Tray</b>. Sekarang centang <b>Remember this decision</b> lalu <b>Allow</b> — sekali saja, tidak muncul lagi.</li>
-          <li>Pilih printer, <b>Simpan printer</b>, Tes cetak.</li>
+          <li>Pasang dan jalankan <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a> di komputer kasir.</li>
+          <li>Klik kanan ikon QZ di taskbar → <b>Advanced → Site Manager</b> → tombol <b>+</b> → <b>Create New</b> → Yes → Yes → Yes (izinkan UAC).</li>
+          <li>Di Desktop muncul folder <b>QZ Tray Demo Cert</b>. Unggah kedua file itu di bawah (digital-certificate.txt dan private-key.pem).</li>
+          <li><b>Validasi QZ Tray</b>. Baru sekarang centang <b>Remember this decision</b> lalu <b>Allow</b> — sekali, tidak muncul lagi.</li>
         </ol>
-        <p class="hint">Belum pasang override.crt? Jendela Allow terkunci jika Remember dicentang — hapus centang dulu, Allow. Nanti setiap cetak ditanya lagi sampai override.crt terpasang.</p>
+        <p class="hint">Remember terkunci jika kunci di aplikasi bukan kunci yang dibuat Site Manager di komputer ini. Jangan campur dengan override.crt lama.</p>
+        <label class="fld">digital-certificate.txt</label>
+        <input type="file" id="qzCertFile" accept=".txt,.crt,.pem,text/plain" onchange="pilihQzBerkas(this,'cert')">
+        <label class="fld">private-key.pem</label>
+        <input type="file" id="qzKeyFile" accept=".pem,.key,.txt,text/plain" onchange="pilihQzBerkas(this,'key')">
+        <p id="qzKeyStatus" class="hint"></p>
         <label class="fld">Cara cetak</label>
         <select id="prtMode">
           <option value="browser">Dialog browser</option>
@@ -931,7 +935,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.36';
+const APP_VERSION = '2026.09.06.37';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -4158,6 +4162,7 @@ function pasangUpdate(){
 
 var QZ_SRC='https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js';
 var SHA_SRC='https://cdn.jsdelivr.net/npm/js-sha256@0.9.0/build/sha256.min.js';
+var JSR_SRC='https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js';
 var QZ_CERT="-----BEGIN CERTIFICATE-----\nMIIDezCCAmOgAwIBAgIUPQY4muYbOSQyHyZs9vBSYYPLxUowDQYJKoZIhvcNAQEL\nBQAwRTESMBAGA1UEAwwJV2FydW5nUE9TMRIwEAYDVQQKDAlXYXJ1bmdQT1MxDjAM\nBgNVBAsMBUthc2lyMQswCQYDVQQGEwJJRDAeFw0yNjA5MDgwMzMzNDVaFw0zNjA5\nMDUwMzMzNDVaMEUxEjAQBgNVBAMMCVdhcnVuZ1BPUzESMBAGA1UECgwJV2FydW5n\nUE9TMQ4wDAYDVQQLDAVLYXNpcjELMAkGA1UEBhMCSUQwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQDBVu102kQcYGldfrEkaz8t0g0zycuyohA3yVOj5Z1t\nRXlMZfO/NK8luDSD9nVOxxyvGxL7/AgvZPgzuI5xOa98QlX3cHiEmZaA1J4kHA1X\n/d49QGgu8bJ8JeKPUJqa5F6pOUjNe0ZJWF6WHX96/CAjaRWH4AUOrRAYJwlDaTQz\nucFDkRJYoSrkSKHuL/vk0VugNgSl17rLdRe9Lrgnx8GqhbfkqjOhcfhODhAmJwux\nrgvdK8du8RWe5f5miDkjDpfTc7tuN0OPD8bCxsgNQKFdjbe2XzwJJOjk8QWkGPF3\nPHlG+aXfBiuyJzCrv4FHTxxmHrMm72snX708KVte2Y1rAgMBAAGjYzBhMB0GA1Ud\nDgQWBBRFz1vRsAFXPgpR3oUX0KvrQZvSrzAfBgNVHSMEGDAWgBRFz1vRsAFXPgpR\n3oUX0KvrQZvSrzAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIChDANBgkq\nhkiG9w0BAQsFAAOCAQEACUkwNvzQlM7rS09MygH78WwVMEDQh8QII8irOHsJWXrP\nRq5mdasTXgUYvrmAqtA/W7cDFawMgcYubEXJcbAFsRHSK/qSqUZsji062V1XwHkd\n7FnsXwz58khNBgNtjhhxag35q5hjaZhaT58nPrrHWJqa2kiOtwIvYn3F1XDPpsPo\no3yJgf1mt84hYB6sWvp/RTqLZPOaC3biorhir+506gmPlql6xA6/jnXDon9qmRut\nvK92EU8y6yJbeRpMTnAJFTZ2VTRS9vXGnvCHX624q6zybpPiHzL8DYg4FhiADvJn\nKmrrnsMsEQ4/U7tFnCfQO+kXhGBNIDD9GEJU4xA1hA==\n-----END CERTIFICATE-----";
 var QZ_PRIV="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDBVu102kQcYGld\nfrEkaz8t0g0zycuyohA3yVOj5Z1tRXlMZfO/NK8luDSD9nVOxxyvGxL7/AgvZPgz\nuI5xOa98QlX3cHiEmZaA1J4kHA1X/d49QGgu8bJ8JeKPUJqa5F6pOUjNe0ZJWF6W\nHX96/CAjaRWH4AUOrRAYJwlDaTQzucFDkRJYoSrkSKHuL/vk0VugNgSl17rLdRe9\nLrgnx8GqhbfkqjOhcfhODhAmJwuxrgvdK8du8RWe5f5miDkjDpfTc7tuN0OPD8bC\nxsgNQKFdjbe2XzwJJOjk8QWkGPF3PHlG+aXfBiuyJzCrv4FHTxxmHrMm72snX708\nKVte2Y1rAgMBAAECggEAWgrcCEHm2rhkGfD5Gxb/k51yHJ5sycMEfpa652f2y39B\noL0SqgglUhHaE2Ni+s9soniffM/CGCCUH7JiVIUjH2Hdm6G73zWQjGt5QyP1aveG\n20v1uXdDQuJ6A3jsqBqXo4RUTa6N63bGhm8ygdqONS+poWBJuq4LAtSbUdPbRgL5\n/WYl8t5sf2rIamg2gjaSO6tCwX+jB853E+ifRmfTGwXcoQfQtYX1h3vf7RwKTYne\nzx5tiNFOfb+WG3liZEFW9xX1z+4yXTjBzK1GQ5pTeAPAB3Ob3R8Ts3bu/yCjyYEg\ntDhhPmaJZxqS6j37x+81GdquHFEdxNb+Ty/XjTyUQQKBgQD80BWqk0+LrV/3RqEC\ndXi/KNMuG3BBmX2+7QJcN1m+ENL1nolX7f28kReBzetNkp+0yJVLiFjiGMtU8xZV\nqx4CNmZZd5Z6I+uklY0lMUpOl1wTQKmgMpD8Y5b339hM0g02ZyyBC5E4vIHCzCYo\nnA7hW8TxmJYOxlHKAW3B/r2QOwKBgQDDxubjCkbf5j60tZxJLb9nQTUwtyw8ugwo\nMlvOGYkXuReyGHaybH24E9g/utGuPTczW82eAp4++OBngBjqjO1jEUbpo4aVBNsa\nsyms6q99v5MNoKw0LkByFA8Idxu7H0wg/p/SqBQ+e488ah4eXEigSLzlNfxpOp34\nAjvrh37UkQKBgQDt9RZPpbR7rkbjwvEOFW//zfdoMJ9qv4SiTwensNmhksheNEjm\nILZx5MeRgDb4nwf/68TKgZ3XwqqwXNYq8JOgVX/kujFC6ciE89cUqN5eNw2NeZGv\nnajmRv70dRdsx1F0YYx8Ml0QYC5rIijQlINVD0HCfXLQmU6mqs2aiaH3vQKBgQCz\nOjsTLMxXm3RagUxTXhM01uh38akI6xXIEtoi4xOzaRp9S5IWo+WwCFLXfRMKXTZU\nyT2C40i1w6fEeOvWhi+omx99Mtw5PlnLpquHhs4j46cfObGMj68mAKEGkewMMYnD\nRvdPpdnqnbkyiL+L8dX3DsAHYpXyS9xkOL9cTw3YUQKBgHmyXrBpI3DnK7yLYmVX\nddhlqrH5+gvr/v9mzBxvy+XjuQH24EaOysAP1+LaW9jrVxpuL4Ih/Vf9pd3wKu0f\nWti2Ywe9bIVv0Ua48rtlIogGrl5L8RgP97y2QfCRlMDvrXETk40NkgOEsUyB5ygp\nnhdjQO2RY7Uc+Wx4BaXakNIG\n-----END PRIVATE KEY-----";
 var _qzSec=false, _qzKey=null;
@@ -4172,21 +4177,84 @@ function qzSigB64(buf){
   for(var i=0;i<u.length;i++) s+=String.fromCharCode(u[i]);
   return btoa(s);
 }
+function qzCert(){
+  try{ var s=localStorage.getItem('warungpos_qz_cert'); if(s && s.indexOf('BEGIN CERTIFICATE')>=0) return s; }catch(e){}
+  return QZ_CERT;
+}
+function qzPriv(){
+  try{ var s=localStorage.getItem('warungpos_qz_key'); if(s && s.indexOf('BEGIN')>=0) return s; }catch(e){}
+  return QZ_PRIV;
+}
+function qzPakaiKunciLokal(){
+  try{ return !!(localStorage.getItem('warungpos_qz_cert') && localStorage.getItem('warungpos_qz_key')); }catch(e){ return false; }
+}
+function hexToB64(hex){
+  hex=String(hex||'').replace(/\s+/g,'');
+  var s='';
+  for(var i=0;i<hex.length;i+=2) s+=String.fromCharCode(parseInt(hex.substr(i,2),16));
+  return btoa(s);
+}
 function qzSignMessage(toSign){
-  var run=function(key){
-    return crypto.subtle.sign({name:'RSASSA-PKCS1-v1_5'}, key, new TextEncoder().encode(String(toSign))).then(qzSigB64);
-  };
-  if(_qzKey) return run(_qzKey);
-  return crypto.subtle.importKey('pkcs8', pemToAb(QZ_PRIV), {name:'RSASSA-PKCS1-v1_5', hash:'SHA-512'}, false, ['sign']).then(function(k){ _qzKey=k; return run(k); });
+  var msg=String(toSign==null?'':toSign);
+  return loadScriptOnce(JSR_SRC).then(function(){
+    if(window.KEYUTIL && window.KJUR){
+      var pk=KEYUTIL.getKey(qzPriv());
+      var sig=new KJUR.crypto.Signature({alg:'SHA512withRSA'});
+      sig.init(pk);
+      sig.updateString(msg);
+      return hexToB64(sig.sign());
+    }
+    throw new Error('jsrsasign');
+  }).catch(function(){
+    var run=function(key){
+      return crypto.subtle.sign({name:'RSASSA-PKCS1-v1_5'}, key, new TextEncoder().encode(msg)).then(qzSigB64);
+    };
+    if(_qzKey) return run(_qzKey);
+    return crypto.subtle.importKey('pkcs8', pemToAb(qzPriv()), {name:'RSASSA-PKCS1-v1_5', hash:'SHA-512'}, false, ['sign']).then(function(k){ _qzKey=k; return run(k); });
+  });
 }
 function setupQzSecurity(){
-  if(_qzSec || !window.qz || !qz.security) return;
-  _qzSec=true;
-  qz.security.setCertificatePromise(function(resolve){ resolve(QZ_CERT); });
+  if(!window.qz || !qz.security) return;
+  qz.security.setCertificatePromise(function(resolve, reject){
+    var c=qzCert();
+    if(c) resolve(c); else reject('Sertifikat QZ kosong');
+  });
   try{ qz.security.setSignatureAlgorithm('SHA512'); }catch(e){}
   qz.security.setSignaturePromise(function(toSign){
     return function(resolve, reject){ qzSignMessage(toSign).then(resolve, reject); };
   });
+  _qzSec=true;
+}
+function qzConnect(force){
+  setupQzSecurity();
+  var go=function(){ return qz.websocket.connect({ retries: 8, delay: 1 }); };
+  if(qzAktif()){
+    if(!force) return Promise.resolve();
+    return qz.websocket.disconnect().catch(function(){}).then(go);
+  }
+  return go();
+}
+function renderQzKeyStatus(){
+  var el=document.getElementById('qzKeyStatus'); if(!el) return;
+  el.textContent=qzPakaiKunciLokal()
+    ? 'Kunci QZ Tray (Site Manager) sudah tersimpan di komputer ini.'
+    : 'Belum unggah kunci Site Manager — Remember tidak bisa dicentang.';
+}
+function pilihQzBerkas(el, kind){
+  var f=el.files && el.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    var s=String(r.result||'');
+    if(kind==='cert' && s.indexOf('BEGIN CERTIFICATE')<0){ toast('File bukan digital-certificate.txt'); return; }
+    if(kind==='key' && s.indexOf('PRIVATE KEY')<0 && s.indexOf('RSA PRIVATE')<0){ toast('File bukan private-key.pem'); return; }
+    try{
+      localStorage.setItem(kind==='cert'?'warungpos_qz_cert':'warungpos_qz_key', s);
+      _qzKey=null;
+    }catch(e){ toast('Gagal simpan kunci'); return; }
+    renderQzKeyStatus();
+    toast(kind==='cert'?'Sertifikat QZ disimpan':'Kunci pribadi QZ disimpan');
+  };
+  r.readAsText(f);
 }
 function unduhQzOverride(){
   var blob=new Blob([QZ_CERT+'\n'], {type:'application/x-x509-ca-cert'});
@@ -4225,8 +4293,8 @@ function ensureQzLib(){
     setupQzSecurity();
     return window.qz;
   }
-  if(window.qz) return Promise.resolve(after());
-  return loadScriptOnce(SHA_SRC).then(function(){ return loadScriptOnce(QZ_SRC); }).then(function(){
+  if(window.qz) return loadScriptOnce(JSR_SRC).then(after);
+  return loadScriptOnce(SHA_SRC).then(function(){ return loadScriptOnce(QZ_SRC); }).then(function(){ return loadScriptOnce(JSR_SRC); }).then(function(){
     if(!window.qz) throw new Error('qz-tray.js tidak termuat');
     return after();
   });
@@ -4258,8 +4326,7 @@ function validasiQz(){
   setQzStatus('Status: memvalidasi…');
   isiQzValid([{ok:0,t:'Menghubungkan ke QZ Tray…'}]);
   ensureQzLib().then(function(){
-    if(qzAktif()) return;
-    return qz.websocket.connect({ retries: 8, delay: 1 });
+    return qzConnect(true);
   }).then(function(){
     return Promise.all([qzVersion(), qz.printers.find()]);
   }).then(function(res){
@@ -4289,8 +4356,7 @@ function validasiQz(){
 function hubungQz(){
   setQzStatus('Status: menghubungkan…');
   ensureQzLib().then(function(){
-    if(qzAktif()) return;
-    return qz.websocket.connect({ retries: 8, delay: 1 });
+    return qzConnect(true);
   }).then(function(){
     setQzStatus();
     toast('QZ Tray terhubung');
@@ -4386,6 +4452,7 @@ function printBrowserDoc(doc, isStruk, html){
 }
 
 function renderPrinter(){
+  try{ renderQzKeyStatus(); }catch(e){}
   const s=printerCfg('struk'), l=printerCfg('laporan');
   const set=function(id,v){ const el=document.getElementById(id); if(el) el.value=v; };
   const modeEl=document.getElementById('prtMode');
@@ -5271,5 +5338,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37ae6c4bba2f543',t:'MTc4ODgzODUwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37b10221e4aea82',t:'MTc4ODg0MDIwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
