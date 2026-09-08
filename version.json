@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.40",
+  "version": "2026.09.06.41",
   "tanggal": "2026-09-08",
-  "catatan": "Diskon kasir wajib otorisasi admin (Authenticator 6 angka atau password admin)."
+  "catatan": "Jurnal otomatis: penjualan, pembelian, retur, cicilan, kas. Buku besar & laba rugi."
 }
