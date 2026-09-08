@@ -423,6 +423,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
     <div class="nav-fold" id="fold-keu">
     <button class="nav-btn admin-only" data-view="laba" onclick="showView('laba')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 16V10M12 16V6M17 16v-8"/></svg> Laba</button>
     <button class="nav-btn admin-only" data-view="arus" onclick="showView('arus')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg> Arus kas</button>
+    <button class="nav-btn admin-only" data-view="jurnal" onclick="showView('jurnal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg> Jurnal</button>
     <button class="nav-btn" data-view="tutup" onclick="showView('tutup')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg> Tutup kasir</button>
     <button class="nav-btn" data-view="laporan" onclick="showView('laporan')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l5 5v11H6z"/><path d="M15 4v5h5M8 13h8M8 17h5"/></svg> Laporan</button>
     </div>
@@ -752,6 +753,37 @@ html.has-session .boot-splash:not(.hide){display:grid}
       <div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Sumber</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr></thead><tbody id="arusBody"></tbody></table></div>
     </div>
 
+    <div class="view" id="view-jurnal">
+      <p class="hint">Jurnal terisi sendiri dari penjualan, pembelian, retur, cicilan, dan kas lain. Debit selalu sama dengan kredit.</p>
+      <div class="toolbar">
+        <input type="date" id="juFrom">
+        <input type="date" id="juTo">
+        <select id="juSumber">
+          <option value="">Semua sumber</option>
+          <option value="penjualan">Penjualan</option>
+          <option value="pembelian">Pembelian</option>
+          <option value="retur_jual">Retur jual</option>
+          <option value="retur_beli">Retur beli</option>
+          <option value="cicilan">Cicilan</option>
+          <option value="kas">Kas lain</option>
+          <option value="batal">Batal jual</option>
+        </select>
+        <button class="btn" type="button" onclick="renderJurnal()">Tampilkan</button>
+        <button class="btn-ghost" type="button" onclick="susunUlangJurnal()">Susun ulang</button>
+      </div>
+      <div class="cu-chips" id="juTabs">
+        <button type="button" class="btn-ghost btn-sm on" data-jutab="jurnal" onclick="setJuTab('jurnal')">Jurnal</button>
+        <button type="button" class="btn-ghost btn-sm" data-jutab="bb" onclick="setJuTab('bb')">Buku besar</button>
+        <button type="button" class="btn-ghost btn-sm" data-jutab="lr" onclick="setJuTab('lr')">Laba rugi</button>
+      </div>
+      <div id="juBbBar" class="app-hidden" style="margin:0 0 10px">
+        <label class="fld">Akun</label>
+        <select id="bbAkun" onchange="renderJurnal()"></select>
+      </div>
+      <div class="dash" id="juDash"></div>
+      <div class="table-wrap"><table><thead id="juHead"></thead><tbody id="juBody"></tbody></table></div>
+    </div>
+
     <!-- USER -->
     <div class="view" id="view-user">
       <p class="hint">Multi kasir: tiap orang punya akun sendiri. Untuk kasir, centang menu yang boleh dibuka. Admin selalu membuka semua menu.</p>
@@ -954,7 +986,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.40';
+const APP_VERSION = '2026.09.06.41';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1145,7 +1177,7 @@ function seed(){
       {id:'PM2',jenis:'bertingkat',nama:'Kapal Api sachet',aktif:1,harga:0,produk_id:'PR11',items:[],tingkat:[{qty:1,harga:1500,label:'Satuan'},{qty:2,harga:2500,label:'Beli 2'},{qty:10,harga:12500,label:'Renteng 10'}]}
     ],
     penjualan:[], penjualanItem:[], pembelian:[], pembelianItem:[],
-    returJual:[], returJualItem:[], returBeli:[], returBeliItem:[], hutang:[], kas:[], tutupKasir:[], opname:[], opnameItem:[],
+    returJual:[], returJualItem:[], returBeli:[], returBeliItem:[], hutang:[], kas:[], jurnal:[], tutupKasir:[], opname:[], opnameItem:[],
     created_at:now
   };
 }
@@ -1169,7 +1201,7 @@ function persistPengaturan(p){
 function loadDB(){
   try{
     var d=JSON.parse(localStorage.getItem(LS_KEY)) || seed();
-    if(!d.kas) d.kas=[]; if(!d.tutupKasir) d.tutupKasir=[]; if(!d.opname) d.opname=[]; if(!d.opnameItem) d.opnameItem=[]; if(!d.promo) d.promo=[];
+    if(!d.kas) d.kas=[]; if(!d.jurnal) d.jurnal=[]; if(!d.tutupKasir) d.tutupKasir=[]; if(!d.opname) d.opname=[]; if(!d.opnameItem) d.opnameItem=[]; if(!d.promo) d.promo=[];
     if(!d.promoInited){
       if(!d.promo.length){
         var golda=(d.produk||[]).find(function(p){ return p.id==='PR1' || /golda/i.test(p.nama||''); });
@@ -1658,7 +1690,9 @@ function localHandle(action, p){
     case 'bayarHutang':{
       const pl=find(d.pelanggan,p.pelanggan_id); if(!pl) throw new Error('Pelanggan tidak ada');
       const j=num(p.jumlah); if(j<=0) throw new Error('Nominal tidak valid'); if(j>num(pl.saldo_hutang)+0.01) throw new Error('Melebihi sisa hutang');
-      catatHutang(pl.id,'cicilan','',j,p.keterangan||'Cicilan hutang'); saveDB(); return {saldo_hutang:pl.saldo_hutang,dibayar:j};
+      catatHutang(pl.id,'cicilan','',j,p.keterangan||'Cicilan hutang');
+      try{ var hx=(d.hutang||[])[(d.hutang||[]).length-1]; jurnalDariCicilan(hx); }catch(e){}
+      saveDB(); return {saldo_hutang:pl.saldo_hutang,dibayar:j};
     }
     case 'getLaporan':{
       const map={penjualan:d.penjualan,pembelian:d.pembelian,retur_penjualan:d.returJual,retur_pembelian:d.returBeli};
@@ -1672,7 +1706,7 @@ function localHandle(action, p){
       if(p.jenis!=='masuk' && p.jenis!=='keluar') throw new Error('Jenis kas tidak valid');
       const j=num(p.jumlah); if(j<=0) throw new Error('Nominal tidak valid');
       const row={id:uid('KS'),tanggal:p.tanggal||nowIso(),jenis:p.jenis,jumlah:j,keterangan:p.keterangan||'',referensi:p.referensi||'',user_id:STATE.user&&STATE.user.id};
-      d.kas=d.kas||[]; d.kas.push(row); saveDB(); return row;
+      d.kas=d.kas||[]; d.kas.push(row); try{ jurnalDariKas(row); }catch(e){} saveDB(); return row;
     }
     case 'getTutupKasir': return (d.tutupKasir||[]).slice().sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal)));
     case 'saveTutupKasir':{
@@ -1770,6 +1804,7 @@ function localPenjualan(p){
   });
   const hutangNom = metode==='hutang'?total:(metode==='campuran'?roundM(total-bayar):0);
   if(hutangNom>0) catatHutang(pelangganId,'hutang',id,hutangNom,'Belanja '+nomor);
+  try{ jurnalDariPenjualan({id:id,nomor:nomor,tanggal:tanggal,total:total,bayar:bayar,metode:metode,status:'selesai',diskon:diskon,items:outItems}); }catch(e){}
   saveDB();
   return {id,nomor,tanggal,subtotal,diskon,total,bayar,kembalian,metode,pelanggan_id:pelangganId,items:outItems};
 }
@@ -1809,6 +1844,7 @@ function localPembelian(p){
     pr.stok=roundQ(num(pr.stok)+qty); pr.harga_beli=hb;
   });
   d.pembelian.push({id,nomor,tanggal:nowIso(),supplier_id:p.supplier_id,user_id:STATE.user&&STATE.user.id,total:roundM(total),status:'selesai',catatan:p.catatan||''});
+  try{ jurnalDariPembelian({id:id,nomor:nomor,tanggal:nowIso(),total:roundM(total)}); }catch(e){}
   saveDB(); return {id,nomor,total:roundM(total)};
 }
 function localReturJual(p){
@@ -1825,6 +1861,7 @@ function localReturJual(p){
   total=roundM(total);
   d.returJual.push({id,nomor,penjualan_id:pj.id,tanggal:nowIso(),user_id:STATE.user&&STATE.user.id,total,alasan:p.alasan||'',metode_refund:p.metode_refund||'tunai'});
   if((p.metode_refund||'')==='potong_hutang' && pj.pelanggan_id && pj.pelanggan_id!=='P0') catatHutang(pj.pelanggan_id,'cicilan',id,total,'Potong hutang retur '+nomor);
+  try{ jurnalDariReturJual({id:id,nomor:nomor,tanggal:nowIso(),total:total,metode_refund:p.metode_refund||'tunai'}); }catch(e){}
   saveDB(); return {id,nomor,total};
 }
 function localReturBeli(p){
@@ -1841,18 +1878,289 @@ function localReturBeli(p){
     if(pr) pr.stok=roundQ(num(pr.stok)-qty);
   });
   d.returBeli.push({id,nomor,pembelian_id:pb.id,tanggal:nowIso(),user_id:STATE.user&&STATE.user.id,total:roundM(total),alasan:p.alasan||''});
+  try{ jurnalDariReturBeli({id:id,nomor:nomor,tanggal:nowIso(),total:roundM(total)}); }catch(e){}
   saveDB(); return {id,nomor,total:roundM(total)};
 }
 
+
+var JU_AKUN={
+  kas:{kode:'1100',nama:'Kas'},
+  piutang:{kode:'1200',nama:'Piutang usaha'},
+  stok:{kode:'1300',nama:'Persediaan'},
+  modal:{kode:'3100',nama:'Modal'},
+  jual:{kode:'4100',nama:'Pendapatan penjualan'},
+  hpp:{kode:'5100',nama:'HPP'},
+  beban:{kode:'6100',nama:'Beban operasional'},
+  lain:{kode:'7100',nama:'Pendapatan lain'}
+};
+function juLine(akun, deb, kre){
+  return {kode:akun.kode, nama:akun.nama, debit:roundM(deb||0), kredit:roundM(kre||0)};
+}
+function juNomor(tgl){
+  var d=String(tgl||todayStr()).slice(0,10).replace(/-/g,'');
+  var pre='JU-'+d+'-', max=0;
+  (STATE.data.jurnal||[]).forEach(function(j){
+    var n=String(j.nomor||'');
+    if(n.indexOf(pre)===0){ var x=parseInt(n.slice(pre.length),10); if(x>max) max=x; }
+  });
+  return pre+String(max+1).padStart(3,'0');
+}
+function juAda(sumber, ref){
+  return (STATE.data.jurnal||[]).some(function(j){ return j.sumber===sumber && String(j.ref_id)===String(ref); });
+}
+function juSimpan(j){
+  if(!j || !j.lines || !j.lines.length) return null;
+  if(j.ref_id && juAda(j.sumber, j.ref_id)) return null;
+  j.lines=j.lines.filter(function(l){ return num(l.debit)||num(l.kredit); });
+  if(!j.lines.length) return null;
+  var deb=0, kre=0;
+  j.lines.forEach(function(l){ deb+=num(l.debit); kre+=num(l.kredit); });
+  deb=roundM(deb); kre=roundM(kre);
+  if(deb!==kre){
+    var diff=roundM(deb-kre);
+    if(Math.abs(diff)>=0.01 && Math.abs(diff)<1){
+      if(diff>0) j.lines.push({kode:'6100',nama:'Pembulatan',debit:0,kredit:diff});
+      else j.lines.push({kode:'6100',nama:'Pembulatan',debit:-diff,kredit:0});
+    }
+  }
+  var d=STATE.data; d.jurnal=d.jurnal||[];
+  j.id=j.id||uid('JU');
+  j.nomor=j.nomor||juNomor(j.tanggal);
+  j.tanggal=j.tanggal||nowIso();
+  j.user_id=j.user_id||(STATE.user&&STATE.user.id)||'';
+  d.jurnal.push(j);
+  try{ saveDB(); }catch(e){}
+  return j;
+}
+function juHppJual(items){
+  var s=0;
+  (items||[]).forEach(function(it){
+    var pr=find(STATE.data.produk, it.produk_id);
+    var hb=num(it.harga_beli!=null?it.harga_beli:(pr&&pr.harga_beli));
+    s+=roundM(num(it.qty)*hb);
+  });
+  return roundM(s);
+}
+function juItemsJual(pj){
+  if(pj&&pj.items&&pj.items.length) return pj.items;
+  return (STATE.data.penjualanItem||[]).filter(function(x){ return String(x.penjualan_id)===String(pj&&pj.id); });
+}
+function jurnalDariPenjualan(pj){
+  if(!pj||!pj.id||String(pj.status)==='batal') return;
+  var total=num(pj.total), bayar=num(pj.bayar), m=String(pj.metode||'tunai').toLowerCase();
+  var kas=0, piut=0;
+  if(m==='hutang') piut=total;
+  else if(m==='campuran'){ kas=Math.min(bayar,total); piut=roundM(total-kas); }
+  else kas=total;
+  var hpp=juHppJual(juItemsJual(pj));
+  var lines=[];
+  if(kas>0) lines.push(juLine(JU_AKUN.kas, kas, 0));
+  if(piut>0) lines.push(juLine(JU_AKUN.piutang, piut, 0));
+  if(total>0) lines.push(juLine(JU_AKUN.jual, 0, total));
+  if(hpp>0){ lines.push(juLine(JU_AKUN.hpp, hpp, 0)); lines.push(juLine(JU_AKUN.stok, 0, hpp)); }
+  juSimpan({sumber:'penjualan', ref_id:pj.id, ref_nomor:pj.nomor, tanggal:pj.tanggal, ket:'Penjualan '+(pj.nomor||pj.id)+' · '+m, lines:lines});
+}
+function jurnalDariPembelian(pb){
+  if(!pb||!pb.id) return;
+  var tot=num(pb.total); if(tot<=0) return;
+  juSimpan({sumber:'pembelian', ref_id:pb.id, ref_nomor:pb.nomor, tanggal:pb.tanggal, ket:'Pembelian '+(pb.nomor||pb.id), lines:[
+    juLine(JU_AKUN.stok, tot, 0), juLine(JU_AKUN.kas, 0, tot)
+  ]});
+}
+function jurnalDariReturJual(rj){
+  if(!rj||!rj.id) return;
+  var tot=num(rj.total); if(tot<=0) return;
+  var items=(STATE.data.returJualItem||[]).filter(function(x){ return String(x.retur_id)===String(rj.id); });
+  var hpp=juHppJual(items.map(function(it){ return {produk_id:it.produk_id, qty:it.qty, harga_beli:it.harga}; }));
+  var potong=String(rj.metode_refund||'')==='potong_hutang';
+  var lines=[juLine(JU_AKUN.jual, tot, 0)];
+  if(potong) lines.push(juLine(JU_AKUN.piutang, 0, tot));
+  else lines.push(juLine(JU_AKUN.kas, 0, tot));
+  if(hpp>0){ lines.push(juLine(JU_AKUN.stok, hpp, 0)); lines.push(juLine(JU_AKUN.hpp, 0, hpp)); }
+  juSimpan({sumber:'retur_jual', ref_id:rj.id, ref_nomor:rj.nomor, tanggal:rj.tanggal, ket:'Retur jual '+(rj.nomor||''), lines:lines});
+}
+function jurnalDariReturBeli(rb){
+  if(!rb||!rb.id) return;
+  var tot=num(rb.total); if(tot<=0) return;
+  juSimpan({sumber:'retur_beli', ref_id:rb.id, ref_nomor:rb.nomor, tanggal:rb.tanggal, ket:'Retur beli '+(rb.nomor||''), lines:[
+    juLine(JU_AKUN.kas, tot, 0), juLine(JU_AKUN.stok, 0, tot)
+  ]});
+}
+function jurnalDariKas(row){
+  if(!row||!row.id) return;
+  var j=num(row.jumlah); if(j<=0) return;
+  var ket=String(row.keterangan||'');
+  var lines;
+  if(row.jenis==='masuk'){
+    var cr=/modal/i.test(ket)?JU_AKUN.modal:JU_AKUN.lain;
+    lines=[juLine(JU_AKUN.kas, j, 0), juLine(cr, 0, j)];
+  } else {
+    lines=[juLine(JU_AKUN.beban, j, 0), juLine(JU_AKUN.kas, 0, j)];
+  }
+  juSimpan({sumber:'kas', ref_id:row.id, ref_nomor:row.id, tanggal:row.tanggal, ket:ket||('Kas '+row.jenis), lines:lines});
+}
+function jurnalDariCicilan(h){
+  if(!h||!h.id||h.jenis!=='cicilan') return;
+  var j=num(h.jumlah); if(j<=0) return;
+  juSimpan({sumber:'cicilan', ref_id:h.id, ref_nomor:h.referensi, tanggal:h.tanggal, ket:h.keterangan||'Cicilan hutang', lines:[
+    juLine(JU_AKUN.kas, j, 0), juLine(JU_AKUN.piutang, 0, j)
+  ]});
+}
+function jurnalBalikPenjualan(pj){
+  if(!pj||!pj.id) return;
+  var asal=(STATE.data.jurnal||[]).find(function(x){ return x.sumber==='penjualan' && String(x.ref_id)===String(pj.id); });
+  if(!asal){
+    var st=pj.status; pj.status='selesai';
+    jurnalDariPenjualan(pj);
+    pj.status=st;
+    asal=(STATE.data.jurnal||[]).find(function(x){ return x.sumber==='penjualan' && String(x.ref_id)===String(pj.id); });
+  }
+  if(!asal||!asal.lines) return;
+  juSimpan({sumber:'batal', ref_id:pj.id, ref_nomor:pj.nomor, tanggal:nowIso(), ket:'Batal penjualan '+(pj.nomor||pj.id), lines:asal.lines.map(function(l){
+    return {kode:l.kode, nama:l.nama, debit:num(l.kredit), kredit:num(l.debit)};
+  })});
+}
+function rebuildJurnal(){
+  STATE.data.jurnal=STATE.data.jurnal||[];
+  var before=STATE.data.jurnal.length;
+  var returId={};
+  (STATE.data.returJual||[]).forEach(function(r){ returId[String(r.id)]=1; });
+  (STATE.data.penjualan||[]).forEach(function(pj){
+    if(String(pj.status)==='batal') return;
+    jurnalDariPenjualan(pj);
+  });
+  (STATE.data.pembelian||[]).forEach(jurnalDariPembelian);
+  (STATE.data.returJual||[]).forEach(jurnalDariReturJual);
+  (STATE.data.returBeli||[]).forEach(jurnalDariReturBeli);
+  (STATE.data.kas||[]).forEach(jurnalDariKas);
+  (STATE.data.hutang||[]).forEach(function(h){
+    if(h.jenis!=='cicilan') return;
+    if(returId[String(h.referensi||'')]) return;
+    jurnalDariCicilan(h);
+  });
+  (STATE.data.penjualan||[]).forEach(function(pj){
+    if(String(pj.status)==='batal') jurnalBalikPenjualan(pj);
+  });
+  return (STATE.data.jurnal||[]).length-before;
+}
+function juListFiltered(){
+  var from=(document.getElementById('juFrom')||{}).value||'';
+  var to=(document.getElementById('juTo')||{}).value||'';
+  var src=(document.getElementById('juSumber')||{}).value||'';
+  var list=(STATE.data.jurnal||[]).filter(function(j){
+    if(src && j.sumber!==src) return false;
+    return inRangeTgl(j.tanggal, from, to);
+  });
+  list.sort(function(a,b){ return String(a.tanggal).localeCompare(String(b.tanggal)); });
+  return list;
+}
+function juSaldoAkun(kode, from, to){
+  var deb=0, kre=0;
+  (STATE.data.jurnal||[]).forEach(function(j){
+    if(!inRangeTgl(j.tanggal, from, to)) return;
+    (j.lines||[]).forEach(function(l){
+      if(l.kode!==kode) return;
+      deb+=num(l.debit); kre+=num(l.kredit);
+    });
+  });
+  return {debit:roundM(deb), kredit:roundM(kre), saldo:roundM(deb-kre)};
+}
+function setJuTab(tab){
+  STATE.juTab=tab;
+  document.querySelectorAll('#juTabs [data-jutab]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-jutab')===tab); });
+  var bar=document.getElementById('juBbBar');
+  if(bar) bar.classList.toggle('app-hidden', tab!=='bb');
+  renderJurnal();
+}
+function susunUlangJurnal(){
+  var n=rebuildJurnal();
+  renderJurnal();
+  toast(n?('Jurnal baru: '+n+' entri'):'Jurnal sudah lengkap dari transaksi.');
+}
+async function renderJurnal(){
+  try{ await ensureLedger(); }catch(e){}
+  if(!STATE.data.jurnal) STATE.data.jurnal=[];
+  if(!STATE.data.jurnal.length) rebuildJurnal();
+  var tab=STATE.juTab||'jurnal';
+  var from=(document.getElementById('juFrom')||{}).value||'';
+  var to=(document.getElementById('juTo')||{}).value||'';
+  var list=juListFiltered();
+  var dash=document.getElementById('juDash'), head=document.getElementById('juHead'), body=document.getElementById('juBody');
+  var bb=document.getElementById('bbAkun');
+  if(bb && !bb.options.length){
+    Object.keys(JU_AKUN).forEach(function(k){
+      var a=JU_AKUN[k];
+      bb.innerHTML+='<option value="'+a.kode+'">'+a.kode+' · '+a.nama+'</option>';
+    });
+  }
+  if(tab==='lr'){
+    var map={};
+    list.forEach(function(j){ (j.lines||[]).forEach(function(l){
+      var m=map[l.kode]||{kode:l.kode,nama:l.nama,debit:0,kredit:0};
+      m.debit+=num(l.debit); m.kredit+=num(l.kredit); map[l.kode]=m;
+    }); });
+    var pend=roundM((map['4100']?map['4100'].kredit-map['4100'].debit:0)+(map['7100']?map['7100'].kredit-map['7100'].debit:0));
+    var hpp=roundM(map['5100']?map['5100'].debit-map['5100'].kredit:0);
+    var beb=roundM(map['6100']?map['6100'].debit-map['6100'].kredit:0);
+    var laba=roundM(pend-hpp-beb);
+    if(dash) dash.innerHTML='<div class="dstat"><span>Pendapatan</span><b>'+rp(pend)+'</b></div>'+
+      '<div class="dstat"><span>HPP</span><b>'+rp(hpp)+'</b></div>'+
+      '<div class="dstat"><span>Beban</span><b>'+rp(beb)+'</b></div>'+
+      '<div class="dstat"><span>Laba / rugi</span><b>'+rp(laba)+'</b></div>';
+    if(head) head.innerHTML='<tr><th>Akun</th><th>Debit</th><th>Kredit</th></tr>';
+    if(body) body.innerHTML=['4100','5100','6100','7100'].map(function(k){
+      var m=map[k]; if(!m) return '';
+      return '<tr><td>'+esc(m.kode+' · '+m.nama)+'</td><td>'+rp(m.debit)+'</td><td>'+rp(m.kredit)+'</td></tr>';
+    }).join('')+'<tr><td><b>Laba (pendapatan − HPP − beban)</b></td><td colspan="2"><b>'+rp(laba)+'</b></td></tr>';
+    return;
+  }
+  if(tab==='bb'){
+    var kode=(bb&&bb.value)||'1100';
+    var saldo=0, rows='';
+    list.forEach(function(j){
+      (j.lines||[]).forEach(function(l){
+        if(l.kode!==kode) return;
+        saldo=roundM(saldo+num(l.debit)-num(l.kredit));
+        rows+='<tr><td>'+esc(String(j.tanggal).replace('T',' ').slice(0,16))+'</td><td>'+esc(j.ket||j.nomor)+'</td><td>'+rp(l.debit)+'</td><td>'+rp(l.kredit)+'</td><td>'+rp(saldo)+'</td></tr>';
+      });
+    });
+    var akunNama=kode;
+    Object.keys(JU_AKUN).forEach(function(k){ if(JU_AKUN[k].kode===kode) akunNama=JU_AKUN[k].kode+' · '+JU_AKUN[k].nama; });
+    if(dash) dash.innerHTML='<div class="dstat"><span>'+esc(akunNama)+'</span><b>'+rp(saldo)+'</b></div>'+
+      '<div class="dstat"><span>Entri</span><b>'+(rows?rows.split('<tr>').length-1:0)+'</b></div>';
+    if(head) head.innerHTML='<tr><th>Waktu</th><th>Keterangan</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr>';
+    if(body) body.innerHTML=rows||'<tr><td colspan="5">Tidak ada mutasi akun ini.</td></tr>';
+    return;
+  }
+  var td=0, tk=0;
+  list.forEach(function(j){ (j.lines||[]).forEach(function(l){ td+=num(l.debit); tk+=num(l.kredit); }); });
+  if(dash) dash.innerHTML='<div class="dstat"><span>Entri</span><b>'+list.length+'</b></div>'+
+    '<div class="dstat"><span>Debit</span><b>'+rp(td)+'</b></div>'+
+    '<div class="dstat"><span>Kredit</span><b>'+rp(tk)+'</b></div>'+
+    '<div class="dstat"><span>Selisih</span><b>'+rp(roundM(td-tk))+'</b></div>';
+  if(head) head.innerHTML='<tr><th></th><th>No</th><th>Waktu</th><th>Sumber</th><th>Keterangan</th><th>Debit</th><th>Kredit</th></tr>';
+  if(body) body.innerHTML=list.map(function(j){
+    var d=0,k=0; (j.lines||[]).forEach(function(l){ d+=num(l.debit); k+=num(l.kredit); });
+    var det='<tr class="app-hidden" id="jd-'+esc(j.id)+'"><td></td><td colspan="6"><table class="op-print" style="margin:0"><thead><tr><th>Akun</th><th>Debit</th><th>Kredit</th></tr></thead><tbody>'+
+      (j.lines||[]).map(function(l){ return '<tr><td>'+esc(l.kode+' · '+l.nama)+'</td><td>'+rp(l.debit)+'</td><td>'+rp(l.kredit)+'</td></tr>'; }).join('')+
+      '</tbody></table></td></tr>';
+    return '<tr><td><button type="button" class="btn-ghost btn-sm" onclick="toggleJurnalDet(\''+String(j.id).replace(/[^A-Za-z0-9_-]/g,'')+'\')">+</button></td><td>'+esc(j.nomor)+'</td><td>'+esc(String(j.tanggal).replace('T',' ').slice(0,16))+'</td><td>'+esc(j.sumber)+'</td><td>'+esc(j.ket||'')+'</td><td>'+rp(d)+'</td><td>'+rp(k)+'</td></tr>'+det;
+  }).join('')||'<tr><td colspan="7">Belum ada jurnal. Jual/beli dulu, atau ketuk Susun ulang.</td></tr>';
+}
+function toggleJurnalDet(id){
+  var el=document.getElementById('jd-'+id);
+  if(el) el.classList.toggle('app-hidden');
+}
+
 /* ================= UI SHELL ================= */
-const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],barcode:['Barcode','Cetak label tempel produk'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
+const TITLES={dash:['Dashboard','Ringkasan toko'],kasir:['Kasir','Transaksi penjualan'],stok:['Stok','Daftar produk & penyesuaian'],opname:['Stok opname','Hitung fisik vs sistem'],beli:['Pembelian','Stok masuk per supplier'],hutang:['Hutang pelanggan','Piutang, cicilan, rincian'],returjual:['Retur penjualan','Kembalikan barang dari pembeli'],returbeli:['Retur pembelian','Kembalikan barang ke supplier'],kategori:['Kategori','Pengelompokan produk'],jenis:['Jenis','Satuan · Minuman · Berat'],supplier:['Supplier','Pemasok barang'],promo:['Promo','Paket bundel & harga bertingkat'],barcode:['Barcode','Cetak label tempel produk'],laba:['Laba','Laba kotor per kategori'],arus:['Arus kas','Masuk, keluar, saldo'],jurnal:['Jurnal','Otomatis dari jual, beli, kas'],tutup:['Tutup kasir','Per kasir · modal, omset, setoran'],laporan:['Laporan','Penjualan, pembelian, retur'],user:['User','Hak akses kasir & admin'],pengaturan:['Pengaturan','Toko, cloud & cadangan data'],printer:['Printer','Struk/nota & laporan terpisah'],update:['Update','Pembaruan aplikasi dari GitHub']};
 
 var AKSES_DEFAULT_KASIR=['dash','kasir','hutang','tutup','laporan'];
 var MENU_AKSES=[
   {id:'dash',label:'Dashboard'},{id:'kasir',label:'Kasir'},{id:'stok',label:'Stok'},{id:'opname',label:'Stok opname'},
   {id:'beli',label:'Pembelian'},{id:'hutang',label:'Hutang pelanggan'},{id:'returjual',label:'Retur penjualan'},{id:'returbeli',label:'Retur pembelian'},
   {id:'kategori',label:'Kategori'},{id:'jenis',label:'Jenis'},{id:'supplier',label:'Supplier'},{id:'promo',label:'Promo'},{id:'barcode',label:'Barcode'},
-  {id:'laporan',label:'Laporan'},{id:'laba',label:'Laba'},{id:'arus',label:'Arus kas'},{id:'tutup',label:'Tutup kasir'},
+  {id:'laporan',label:'Laporan'},{id:'laba',label:'Laba'},{id:'arus',label:'Arus kas'},{id:'jurnal',label:'Jurnal'},{id:'tutup',label:'Tutup kasir'},
   {id:'user',label:'User'},{id:'printer',label:'Printer'},{id:'pengaturan',label:'Pengaturan'},{id:'update',label:'Update'}
 ];
 function aksesList(user){
@@ -1922,6 +2230,7 @@ function showView(name){
   if(name==='barcode') renderBarcode();
   if(name==='laba'){ const t=todayStr(); document.getElementById('labaFrom').value=t.slice(0,8)+'01'; document.getElementById('labaTo').value=t; renderLaba(); }
   if(name==='arus'){ const t=todayStr(); document.getElementById('arusFrom').value=t.slice(0,8)+'01'; document.getElementById('arusTo').value=t; renderArusKas(); }
+  if(name==='jurnal'){ const t=todayStr(); document.getElementById('juFrom').value=t.slice(0,8)+'01'; document.getElementById('juTo').value=t; renderJurnal(); }
   if(name==='tutup'){ const el=document.getElementById('tkTgl'); if(el && !el.value) el.value=todayStr(); renderTutupKasir(); }
   if(name==='laporan'){ const t=todayStr(); document.getElementById('lapFrom').value=t.slice(0,8)+'01'; document.getElementById('lapTo').value=t; renderLaporan(); }
   if(name==='user') renderUser();
@@ -1936,7 +2245,7 @@ function toggleSide(){
   if(d) d.classList.toggle('on', s.classList.contains('open'));
 }
 
-var NAV_FOLD_MAP={returjual:'retur',returbeli:'retur',kategori:'master',jenis:'master',supplier:'master',promo:'master',barcode:'master',laba:'keu',arus:'keu',tutup:'keu',laporan:'keu',user:'sistem',printer:'sistem',pengaturan:'sistem',update:'sistem'};
+var NAV_FOLD_MAP={returjual:'retur',returbeli:'retur',kategori:'master',jenis:'master',supplier:'master',promo:'master',barcode:'master',laba:'keu',arus:'keu',jurnal:'keu',tutup:'keu',laporan:'keu',user:'sistem',printer:'sistem',pengaturan:'sistem',update:'sistem'};
 function toggleNavFold(id){
   document.querySelectorAll('.nav-fold').forEach(function(f){
     const mine=f.id==='fold-'+id;
@@ -4864,6 +5173,7 @@ function localBatalPenjualan(p){
   const metode=String(pj.metode||'').toLowerCase();
   const hutangNom=metode==='hutang'?num(pj.total):(metode==='campuran'?roundM(num(pj.total)-num(pj.bayar)):0);
   if(hutangNom>0) catatHutang(pj.pelanggan_id,'batal',pj.id,hutangNom,'Batal '+pj.nomor);
+  try{ jurnalBalikPenjualan(pj); }catch(e){}
   pj.status='batal';
   saveDB();
   return pj;
@@ -5619,5 +5929,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37d209488d3df9f',t:'MTc4ODg2MTg0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37db13f9cb135f2',t:'MTc4ODg2Nzc3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
