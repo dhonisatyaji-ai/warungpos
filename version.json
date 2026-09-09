@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.46",
+  "version": "2026.09.06.47",
   "tanggal": "2026-09-09",
-  "catatan": "Tutup kasir sinkron omset dari kasir: tanggal lokal, semua kasir, muat ulang nota."
+  "catatan": "Struk penjualan dan tutup kasir: nama toko dan alamat di tengah."
 }
