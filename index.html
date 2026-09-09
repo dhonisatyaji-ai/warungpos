@@ -331,6 +331,9 @@ td.col-aksi .btn{white-space:nowrap}
 .struk .kv{display:grid;grid-template-columns:13ch 1fr;align-items:start}
 .struk .kv .k{white-space:nowrap}
 .struk .kv .v{min-width:0;word-break:break-word}
+.struk .struk-head{text-align:center;margin:0 0 6px;line-height:1.35}
+.struk .struk-head b{display:block;font-size:1.15em}
+.struk .struk-head div{word-break:break-word}
 .muted{color:var(--muted)}
 .danger-txt{color:var(--danger);font-weight:700}
 .ok-txt{color:var(--ok);font-weight:700}
@@ -1038,7 +1041,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.46';
+const APP_VERSION = '2026.09.06.47';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3394,6 +3397,14 @@ async function prosesBayar(){
   }catch(e){ toast(e.message); }
   finally { window._bayarLock=false; }
 }
+function strukKepalaToko(){
+  var set=(STATE.data&&STATE.data.pengaturan)||{};
+  var html='<div class="struk-head"><b>'+esc(set.toko_nama||'WarungPOS')+'</b>';
+  if(set.toko_alamat) html+='<div>'+esc(set.toko_alamat)+'</div>';
+  if(set.toko_telp) html+='<div>'+esc(set.toko_telp)+'</div>';
+  html+='</div>';
+  return html;
+}
 function strukWaktu(t){
   t=String(t==null?'':t).replace('T',' ').replace(/Z$/,'');
   if(t.length>=16) return t.slice(0,16);
@@ -3429,7 +3440,7 @@ function buatStrukHtml(res){
   } else {
     pay=met;
   }
-  return '<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>'+esc(set.toko_alamat||'')+'<br>'+esc(set.toko_telp||'')+
+  return '<div class="struk">'+strukKepalaToko()+
     '<hr class="dashline">'+(String(res.status)==='batal'?'<div><b>BATAL</b></div>':'')+
     strukKv('No.inv', res.nomor)+
     strukKv('Tanggal/waktu', strukWaktu(res.tanggal))+
@@ -3497,6 +3508,9 @@ function printDokumen(kind, html){
     '.struk .kv{display:grid;grid-template-columns:13ch 1fr;align-items:start}'+
     '.struk .kv .k{white-space:nowrap}'+
     '.struk .kv .v{min-width:0;word-break:break-word}'+
+    '.struk .struk-head{text-align:center;margin:0 0 6px;line-height:1.35}'+
+    '.struk .struk-head b{display:block;font-size:1.15em}'+
+    '.struk .struk-head div{word-break:break-word}'+
     'hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}'+
     '.op-ttd{display:flex;justify-content:space-between;gap:12px;margin-top:28px;text-align:center;font-size:12px}'+
     '.op-ttd div{flex:1}.op-ttd .garis{margin-top:48px;border-top:1px solid #111;padding-top:6px}'+
@@ -6144,7 +6158,7 @@ function cetakTutupKasir(){
     return '<div class="sr"><span>'+esc(it.deskripsi||'-')+'</span>'+rpKolom(it.nilai)+'</div>';
   }).join('');
   const kn=find(STATE.data.user, tkKasirId())||STATE.user||{};
-  const html='<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>TUTUP KASIR<br>'+esc(tgl)+'<br>Kasir: '+esc(kn.nama||STATE.user&&STATE.user.nama||'')+
+  const html='<div class="struk">'+strukKepalaToko()+'<div class="struk-head"><b>TUTUP KASIR</b><div>'+esc(tgl)+'</div><div>Kasir: '+esc(kn.nama||STATE.user&&STATE.user.nama||'')+'</div></div>'+
     '<hr class="dashline">'+
     '<div class="sr"><span>Saldo awal</span>'+rpKolom(h.awal)+'</div>'+
     '<div class="sr"><span>Saldo tambahan</span>'+rpKolom(h.tambah)+'</div>'+
@@ -6205,5 +6219,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a382b9e92fb44ac7',t:'MTc4ODkyMDU1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a383d61efe7cb5a8',t:'MTc4ODkzMjE5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
