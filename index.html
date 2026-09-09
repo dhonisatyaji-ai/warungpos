@@ -295,7 +295,26 @@ td.col-aksi .btn{white-space:nowrap}
 .pecahan .cell{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
 .pecahan .cell span{display:block;font-size:12px;font-weight:700;color:#57534e}
 .pecahan .cell small{display:block;color:var(--muted);margin-top:4px}
-.tk-setoran{font-size:26px;font-weight:800;color:var(--forest)}
+.tk-setoran{font-size:22px;font-weight:800;color:var(--danger)}
+.tk-h{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#57534e}
+.tk-row{display:grid;grid-template-columns:150px minmax(140px,280px);gap:8px;align-items:center;margin:6px 0}
+.tk-row>span{text-align:right;font-weight:700}
+.tk-kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 22px;margin:12px 0;max-width:860px}
+.tk-kv div{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.tk-kv b{font-variant-numeric:tabular-nums}
+.tk-subrow{display:grid;grid-template-columns:150px minmax(140px,280px);gap:8px;align-items:center;margin:10px 0 18px}
+.tk-subrow>span{text-align:right;font-weight:800}
+.tk-sub{font-size:22px;font-weight:800;color:var(--danger)}
+.tk-out{width:100%;border-collapse:collapse;font-size:13px}
+.tk-out th,.tk-out td{border:1px solid var(--line);padding:3px 4px;white-space:normal}
+.tk-out th{background:#f6f0e6;font-size:11px;text-transform:none;letter-spacing:0}
+.tk-out td:last-child,.tk-out th:last-child{width:128px}
+.tk-out input{width:100%;border:0;padding:8px;border-radius:8px;background:#fff}
+.tk-out tfoot td{font-weight:800;background:#fffdf8}
+.tk-den{display:grid;grid-template-columns:7.4em 1fr;gap:6px 8px;align-items:center}
+.tk-den>span{text-align:right;font-weight:700;font-size:13px}
+.tk-totline{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;font-weight:700}
+.tk-setor-line{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line)}
 .kembali-box{margin-top:12px;padding:14px 16px;border-radius:16px;background:#ecfdf5;border:1px solid #a7f3d0;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .kembali-box.nontunai{background:#eff6ff;border-color:#bfdbfe}
 .kembali-box.nontunai span{color:#1e40af}
@@ -332,6 +351,9 @@ hr.dashline{border:0;border-top:1px dashed #999;margin:8px 0}
   #view-kasir.active{padding-bottom:calc(70px + var(--safe-b))}
   .two,.three,.choice{grid-template-columns:1fr}
   .choice.pay-grid{grid-template-columns:1fr 1fr}
+  .tk-kv{grid-template-columns:1fr}
+  .tk-row,.tk-subrow{grid-template-columns:1fr}
+  .tk-row>span,.tk-subrow>span{text-align:left}
 }
 #printArea{display:none}
 @media print{
@@ -819,7 +841,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
     <!-- TUTUP KASIR -->
     <div class="view" id="view-tutup">
-      <p class="hint">Setiap kasir tutup laci sendiri. Omset = penjualan tunai kasir ini. Setoran = modal awal + omset − pengeluaran − modal besok. Modal besok jadi modal awal kasir yang sama besok.</p>
+      <p class="hint">Saldo awal + saldo tambahan + tunai − pengeluaran − modal besok = uang disetor. Pengeluaran diisi manual. Modal besok isi <b>nominal rupiah</b> per pecahan (bukan lembar).</p>
       <div class="toolbar">
         <label class="fld" style="margin:0">Tanggal</label>
         <input type="date" id="tkTgl" onchange="renderTutupKasir()">
@@ -828,27 +850,34 @@ html.has-session .boot-splash:not(.hide){display:grid}
         <button class="btn" onclick="renderTutupKasir()">Hitung ulang</button>
         <button class="btn-ghost" onclick="cetakTutupKasir()">Cetak setoran</button>
       </div>
-      <div class="dash" id="tkDash"></div>
-      <div class="card" style="margin-bottom:12px">
+      <div class="card tk-sheet" style="margin-bottom:12px">
+        <h3 class="tk-h">Detail</h3>
+        <div class="tk-row"><span>Saldo Awal :</span><input id="tkModalAwal" type="number" min="0" value="0" oninput="hitungTutup()"></div>
+        <p class="hint" id="tkModalHint">Dari modal besok tutup sebelumnya. Admin boleh mengoreksi.</p>
+        <div class="tk-row"><span>Saldo Tambahan :</span><input id="tkSaldoTambahan" type="number" min="0" value="0" oninput="hitungTutup()"></div>
+        <div class="tk-kv" id="tkKv"></div>
+        <div class="tk-subrow"><span>SUBTOTAL :</span><b id="tkSubtotal" class="tk-sub">Rp 0</b></div>
         <div class="two">
           <div>
-            <label class="fld">Modal awal</label>
-            <input id="tkModalAwal" type="number" min="0" value="0" oninput="hitungTutup()">
-            <p class="hint" id="tkModalHint">Dari modal besok tutup sebelumnya. Admin boleh mengoreksi.</p>
+            <h3 class="tk-h">Pengeluaran</h3>
+            <table class="tk-out">
+              <thead><tr><th>Deskripsi</th><th>Nilai</th></tr></thead>
+              <tbody id="tkKeluarRows"></tbody>
+              <tfoot><tr><td>TOTAL PENGELUARAN : RP.</td><td id="tkKeluarTotal">Rp 0</td></tr></tfoot>
+            </table>
+            <button type="button" class="btn-ghost btn-sm" style="margin-top:8px" onclick="tambahTkKeluar()">+ Baris</button>
+            <p class="hint" id="tkKeluarHint"></p>
           </div>
           <div>
-            <label class="fld">Catatan</label>
-            <input id="tkCatatan" placeholder="Opsional">
+            <h3 class="tk-h">Modal besok</h3>
+            <p class="hint">Isi nominal rupiah yang ditinggal di laci, bukan jumlah lembar.</p>
+            <div class="tk-den" id="tkPecahan"></div>
+            <div class="tk-totline"><span>TOTAL MODAL BESOK: RP.</span><b id="tkModalBesok">Rp 0</b></div>
+            <div class="tk-totline tk-setor-line"><span>UANG YANG DISETOR :</span><b id="tkSetoran" class="tk-setoran">Rp 0</b></div>
           </div>
         </div>
-        <div class="dash" style="margin-top:12px" id="tkRingkas"></div>
-        <h3 style="margin:14px 0 6px;font-size:16px">Rincian modal besok</h3>
-        <p class="hint">Isi <b>nominal rupiah</b> per pecahan yang ditinggal di laci. Bukan jumlah lembar.</p>
-        <div class="pecahan" id="tkPecahan"></div>
-        <div class="row-btns" style="margin-top:12px;align-items:center">
-          <div>Modal besok <b id="tkModalBesok">Rp 0</b></div>
-          <div class="right">Setoran <span class="tk-setoran" id="tkSetoran">Rp 0</span></div>
-        </div>
+        <label class="fld">Catatan</label>
+        <input id="tkCatatan" placeholder="Opsional">
         <p class="hint" id="tkStatus"></p>
         <button class="btn btn-gold full" id="tkSimpanBtn" style="margin-top:10px" onclick="simpanTutupKasir()">Simpan tutup kasir</button>
       </div>
@@ -1008,7 +1037,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.44';
+const APP_VERSION = '2026.09.06.45';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -5823,33 +5852,81 @@ function isiPecahan(rincian){
     el.value=v||0;
   });
 }
+function pecahanLabel(p){
+  return String(p.label||'').replace(/^Rp\s*/,'')+',- :';
+}
+function ringkasKasirHari(tgl, uid){
+  var omset=0, tunai=0, kartu=0, diskon=0, nota=0, retur=0;
+  (STATE.data.penjualan||[]).forEach(function(p){
+    if(String(p.tanggal).slice(0,10)!==tgl || p.status==='batal' || !sameKasir(p,uid)) return;
+    nota+=1;
+    omset+=num(p.total);
+    diskon+=num(p.diskon);
+    var m=String(p.metode||'tunai').toLowerCase();
+    if(m==='tunai') tunai+=num(p.bayar!=null?p.bayar:p.total);
+    else if(m==='campuran') tunai+=num(p.bayar);
+    else if(m==='qris'||m==='transfer'||m==='debit') kartu+=num(p.total);
+  });
+  (STATE.data.hutang||[]).forEach(function(h){
+    if(h.jenis==='cicilan' && String(h.tanggal).slice(0,10)===tgl && sameKasir(h,uid)) tunai+=num(h.jumlah);
+  });
+  (STATE.data.returJual||[]).forEach(function(r){
+    if(String(r.tanggal).slice(0,10)!==tgl || !sameKasir(r,uid)) return;
+    if(String(r.metode_refund||'tunai')==='potong_hutang') return;
+    retur+=num(r.total);
+  });
+  return {omset:roundM(omset), tunai:roundM(tunai), kartu:roundM(kartu), diskon:roundM(diskon), nota:nota, retur:roundM(retur)};
+}
+function tkKeluarItems(){
+  var out=[];
+  document.querySelectorAll('#tkKeluarRows tr').forEach(function(tr){
+    var d=tr.querySelector('.tk-desk');
+    var n=tr.querySelector('.tk-nilai');
+    var desk=d?String(d.value||'').trim():'';
+    var val=num(n&&n.value);
+    if(desk || val) out.push({deskripsi:desk, nilai:val});
+  });
+  return out;
+}
+function tkKeluarTotal(){
+  return roundM(tkKeluarItems().reduce(function(s,x){ return s+num(x.nilai); },0));
+}
+function tkKeluarBaris(it){
+  it=it||{};
+  return '<tr><td><input class="tk-desk" value="'+esc(it.deskripsi||'')+'" oninput="hitungTutup()"></td>'+
+    '<td><input class="tk-nilai" type="number" min="0" step="any" inputmode="numeric" value="'+(it.nilai!=null&&it.nilai!==''?it.nilai:0)+'" oninput="hitungTutup()"></td></tr>';
+}
+function renderTkKeluar(items){
+  items=items||[];
+  var n=Math.max(8, items.length);
+  var html='', i;
+  for(i=0;i<n;i++) html+=tkKeluarBaris(items[i]||{});
+  var box=document.getElementById('tkKeluarRows');
+  if(box) box.innerHTML=html;
+}
+function tambahTkKeluar(){
+  var box=document.getElementById('tkKeluarRows');
+  if(!box) return;
+  box.insertAdjacentHTML('beforeend', tkKeluarBaris({}));
+}
 function hitungTutup(){
   var awal=num((document.getElementById('tkModalAwal')||{}).value);
-  var omset=num(window._tkOmset||0);
-  var keluar=num(window._tkKeluar||0);
+  var tambah=num((document.getElementById('tkSaldoTambahan')||{}).value);
+  var stt=window._tkStat||{};
+  var tunai=num(stt.tunai);
+  var keluar=tkKeluarTotal();
   var besok=pecahanTotal();
-  var setor=roundM(awal+omset-keluar-besok);
-  PECAHAN.forEach(function(p){
-    var el=document.getElementById('tk_'+p.k);
-    var sub=document.getElementById('tksub_'+p.k);
-    if(sub){
-      var nom=num(el&&el.value);
-      var nlem=p.n?Math.round(nom/p.n):0;
-      sub.textContent=nom? (rp(nom)+(nlem? ' · ±'+nlem+' lbr':'')) : 'Rp 0';
-    }
-  });
+  var sub=roundM(awal+tambah+tunai);
+  var setor=roundM(sub-keluar-besok);
   var mb=document.getElementById('tkModalBesok'); if(mb) mb.textContent=rp(besok);
-  var st=document.getElementById('tkSetoran'); if(st){ st.textContent=rp(setor); st.style.color=setor<0?'var(--danger)':'var(--forest)'; }
-  var ring=document.getElementById('tkRingkas');
-  if(ring){
-    ring.innerHTML=
-      '<div class="dstat"><span>Modal awal</span><b>'+rp(awal)+'</b></div>'+
-      '<div class="dstat"><span>Omset (uang masuk)</span><b class="ok-txt">'+rp(omset)+'</b></div>'+
-      '<div class="dstat"><span>Pengeluaran</span><b class="danger-txt">'+rp(keluar)+'</b></div>'+
-      '<div class="dstat"><span>Modal besok</span><b>'+rp(besok)+'</b></div>'+
-      '<div class="dstat"><span>Setoran</span><b class="'+(setor<0?'danger-txt':'ok-txt')+'">'+rp(setor)+'</b></div>';
-  }
-  return {awal:awal, omset:omset, keluar:keluar, besok:besok, setor:setor, rincian:bacaPecahan()};
+  var kt=document.getElementById('tkKeluarTotal'); if(kt) kt.textContent=rp(keluar);
+  var su=document.getElementById('tkSubtotal'); if(su) su.textContent=rp(sub);
+  var st=document.getElementById('tkSetoran'); if(st){ st.textContent=rp(setor); st.style.color=setor<0?'var(--danger)':'var(--danger)'; }
+  return {
+    awal:awal, tambah:tambah, tunai:tunai, omset:tunai, omset_nota:num(stt.omset),
+    keluar:keluar, besok:besok, setor:setor, sub:sub,
+    rincian:bacaPecahan(), items:tkKeluarItems()
+  };
 }
 async function renderTutupKasir(){
   await ensureLedger();
@@ -5872,9 +5949,10 @@ async function renderTutupKasir(){
   if(saved) awal=num(saved.modal_awal);
   else if(prev) awal=num(prev.modal_besok);
   else awal=num(peng.kas_modal_awal);
-  const omset=omsetHari(tgl, uid), keluar=pengeluaranHari(tgl, uid);
-  window._tkOmset=omset;
-  window._tkKeluar=keluar;
+  const stat=ringkasKasirHari(tgl, uid);
+  window._tkStat=stat;
+  window._tkOmset=stat.tunai;
+  window._tkKeluar=pengeluaranHari(tgl, uid);
   const awalInp=document.getElementById('tkModalAwal');
   awalInp.value=awal;
   awalInp.readOnly=!isAdmin;
@@ -5884,24 +5962,30 @@ async function renderTutupKasir(){
     if(prev) hint.textContent='Dari modal besok tutup '+String(prev.tanggal).slice(0,10)+'. '+(isAdmin?'Admin boleh mengoreksi.':'Hanya admin yang boleh mengubah.');
     else hint.textContent=isAdmin?'Belum ada tutup sebelumnya. Isi modal awal laci.':'Belum ada tutup sebelumnya. Minta admin mengisi modal awal.';
   }
+  const rin=parseRincian(saved&&saved.rincian);
+  var tambEl=document.getElementById('tkSaldoTambahan');
+  if(tambEl) tambEl.value=num(saved&&saved.saldo_tambahan!=null?saved.saldo_tambahan:rin._saldo_tambahan);
   document.getElementById('tkCatatan').value=saved&&saved.catatan||'';
+  const kv=document.getElementById('tkKv');
+  if(kv) kv.innerHTML=
+    '<div><span>Omset :</span><b>'+rp(stat.omset)+'</b></div>'+
+    '<div><span>Tunai :</span><b>'+rp(stat.tunai)+'</b></div>'+
+    '<div><span>Retur :</span><b>'+rp(stat.retur)+'</b></div>'+
+    '<div><span>Jumlah Nota :</span><b>'+stat.nota+'</b></div>'+
+    '<div><span>Kartu :</span><b>'+rp(stat.kartu)+'</b></div>'+
+    '<div><span>Diskon :</span><b>'+rp(stat.diskon)+'</b></div>';
+  renderTkKeluar(rin._pengeluaran||[]);
+  const kh=document.getElementById('tkKeluarHint');
+  if(kh) kh.textContent=window._tkKeluar?('Tercatat sistem (pembelian/retur/kas): '+rp(window._tkKeluar)+'. Tidak otomatis masuk; isi manual jika perlu.'):'Isi deskripsi dan nilai. Baris kosong diabaikan.';
   const box=document.getElementById('tkPecahan');
   box.innerHTML=PECAHAN.map(p=>
-    '<div class="cell"><span>'+p.label+'</span>'+
-    '<input id="tk_'+p.k+'" type="number" min="0" step="1" inputmode="numeric" placeholder="Nominal Rp" value="0" oninput="hitungTutup()">'+
-    '<small id="tksub_'+p.k+'">Rp 0</small></div>'
+    '<span>'+esc(pecahanLabel(p))+'</span>'+
+    '<input id="tk_'+p.k+'" type="number" min="0" step="1" inputmode="numeric" placeholder="Nominal Rp" value="0" oninput="hitungTutup()">'
   ).join('');
-  isiPecahan(saved&&saved.rincian);
-  const dash=document.getElementById('tkDash');
-  const omsetTotal=(STATE.data.penjualan||[]).filter(p=>String(p.tanggal).slice(0,10)===tgl && p.status!=='batal').reduce((s,p)=>s+num(p.total),0);
-  dash.innerHTML=
-    '<div class="dstat"><span>Omset tunai (rumus)</span><b>'+rp(window._tkOmset)+'</b></div>'+
-    '<div class="dstat"><span>Omset total nota</span><b>'+rp(omsetTotal)+'</b></div>'+
-    '<div class="dstat"><span>Pengeluaran</span><b>'+rp(window._tkKeluar)+'</b></div>'+
-    '<div class="dstat"><span>Status</span><b>'+(saved?'Sudah ditutup':'Belum ditutup')+'</b></div>';
+  isiPecahan(rin);
   const st=document.getElementById('tkStatus');
   if(saved) st.textContent='Sudah ditutup '+esc(saved.created_at||'')+(saved.user_id?' · user '+saved.user_id:'')+'. Simpan lagi untuk memperbarui.';
-  else st.textContent='Omset = penjualan tunai/campuran + cicilan. Pengeluaran = pembelian + retur tunai + kas keluar.';
+  else st.textContent='SUBTOTAL = saldo awal + saldo tambahan + tunai. Setoran = subtotal − pengeluaran − modal besok.';
   const btn=document.getElementById('tkSimpanBtn');
   if(btn){
     if(saved && !isAdmin){ btn.disabled=true; btn.textContent='Sudah ditutup (hanya admin yang boleh ubah)'; }
@@ -5932,9 +6016,14 @@ async function simpanTutupKasir(){
   }
   const h=hitungTutup();
   if(h.setor<0 && !confirm('Setoran minus '+rp(h.setor)+'. Tetap simpan?')) return;
+  const rin=Object.assign({}, h.rincian, {
+    _pengeluaran:h.items||[],
+    _saldo_tambahan:h.tambah,
+    _stat:window._tkStat||{}
+  });
   const payload={
     tanggal:tgl, modal_awal:h.awal, omset:h.omset, pengeluaran:h.keluar,
-    modal_besok:h.besok, setoran:h.setor, rincian:h.rincian,
+    modal_besok:h.besok, setoran:h.setor, rincian:rin,
     catatan:document.getElementById('tkCatatan').value, user_id:uidk
   };
   try{
@@ -5953,24 +6042,36 @@ function cetakTutupKasir(){
   const h=hitungTutup();
   const tgl=(document.getElementById('tkTgl')||{}).value||todayStr();
   const set=STATE.data.pengaturan||{};
+  const stt=window._tkStat||{};
   const rinci=PECAHAN.map(p=>{
     const q=num((document.getElementById('tk_'+p.k)||{}).value);
     if(!q) return '';
-    return '<div style="display:flex;justify-content:space-between"><span>'+p.label+'</span><span>'+rp(q)+'</span></div>';
+    return '<div class="sr"><span>'+esc(pecahanLabel(p))+'</span>'+rpKolom(q)+'</div>';
+  }).join('');
+  const kel=(h.items||[]).map(function(it){
+    return '<div class="sr"><span>'+esc(it.deskripsi||'-')+'</span>'+rpKolom(it.nilai)+'</div>';
   }).join('');
   const kn=find(STATE.data.user, tkKasirId())||STATE.user||{};
   const html='<div class="struk"><b>'+esc(set.toko_nama||'WarungPOS')+'</b><br>TUTUP KASIR<br>'+esc(tgl)+'<br>Kasir: '+esc(kn.nama||STATE.user&&STATE.user.nama||'')+
     '<hr class="dashline">'+
-    '<div style="display:flex;justify-content:space-between"><span>Modal awal</span><span>'+rp(h.awal)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Omset</span><span>'+rp(h.omset)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Pengeluaran</span><span>'+rp(h.keluar)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between"><span>Modal besok</span><span>'+rp(h.besok)+'</span></div>'+
-    '<hr class="dashline"><b>Rincian modal besok</b>'+(rinci||'<div class="muted">-</div>')+
-    '<hr class="dashline"><div style="display:flex;justify-content:space-between"><b>SETORAN</b><b>'+rp(h.setor)+'</b></div>'+
+    '<div class="sr"><span>Saldo awal</span>'+rpKolom(h.awal)+'</div>'+
+    '<div class="sr"><span>Saldo tambahan</span>'+rpKolom(h.tambah)+'</div>'+
+    '<div class="sr"><span>Omset</span>'+rpKolom(stt.omset)+'</div>'+
+    '<div class="sr"><span>Tunai</span>'+rpKolom(h.tunai)+'</div>'+
+    '<div class="sr"><span>Kartu</span>'+rpKolom(stt.kartu)+'</div>'+
+    '<div class="sr"><span>Retur</span>'+rpKolom(stt.retur)+'</div>'+
+    '<div class="sr"><span>Diskon</span>'+rpKolom(stt.diskon)+'</div>'+
+    '<div class="sr"><span>Jumlah nota</span><span>'+(stt.nota||0)+'</span></div>'+
+    '<div class="sr"><span>SUBTOTAL</span>'+rpKolom(h.sub, true)+'</div>'+
+    '<hr class="dashline"><b>Pengeluaran</b>'+(kel||'<div class="muted">-</div>')+
+    '<div class="sr"><span>Total pengeluaran</span>'+rpKolom(h.keluar)+'</div>'+
+    '<hr class="dashline"><b>Modal besok</b>'+(rinci||'<div class="muted">-</div>')+
+    '<div class="sr"><span>Total modal besok</span>'+rpKolom(h.besok)+'</div>'+
+    '<hr class="dashline"><div class="sr"><b>UANG DISETOR</b>'+rpKolom(h.setor, true)+'</div>'+
     '<hr class="dashline"><center>'+esc(document.getElementById('tkCatatan').value||'')+'</center></div>'+
     '<div class="row-btns" style="margin-top:10px"><button class="btn" onclick="printStruk()">Cetak</button><button class="btn-ghost" onclick="closeModal()">Tutup</button></div>';
   modal(html);
-  document.getElementById('printArea').innerHTML=html;
+  var pa=document.getElementById('printArea'); if(pa) pa.innerHTML=html;
 }
 
 /* ================= HELPERS ================= */
@@ -6012,5 +6113,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37de8c16adc9a58',t:'MTc4ODg3MDA0Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
