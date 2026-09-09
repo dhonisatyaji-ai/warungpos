@@ -856,6 +856,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
         <p class="hint" id="tkModalHint">Dari modal besok tutup sebelumnya. Admin boleh mengoreksi.</p>
         <div class="tk-row"><span>Saldo Tambahan :</span><input id="tkSaldoTambahan" type="number" min="0" value="0" oninput="hitungTutup()"></div>
         <div class="tk-kv" id="tkKv"></div>
+        <p class="hint" id="tkSyncHint"></p>
         <div class="tk-subrow"><span>SUBTOTAL :</span><b id="tkSubtotal" class="tk-sub">Rp 0</b></div>
         <div class="two">
           <div>
@@ -1037,7 +1038,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.45';
+const APP_VERSION = '2026.09.06.46';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1125,6 +1126,30 @@ function hideGasBanner(){
 function uid(p){ return p + Date.now().toString(36) + Math.floor(Math.random()*900+100); }
 function nowIso(){ const d=new Date(); const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); }
 function todayStr(){ return nowIso().slice(0,10); }
+function tglLokal(t){
+  var s=String(t==null?'':t).trim();
+  if(!s) return '';
+  if(/Z$/i.test(s) || /[+-]\d{2}:\d{2}$/.test(s)){
+    var d=new Date(s);
+    if(!isNaN(d.getTime())){
+      var z=function(n){ return String(n).padStart(2,'0'); };
+      return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
+    }
+  }
+  return s.slice(0,10);
+}
+function pjBatal(p){
+  var s=String((p&&p.status)||'').toLowerCase();
+  return s==='batal'||s==='void'||s==='cancel'||s==='cancelled';
+}
+function pjTotal(p){
+  if(!p) return 0;
+  if(p.total!=null && p.total!=='') return num(p.total);
+  if(p.grand_total!=null) return num(p.grand_total);
+  if(p.jumlah!=null) return num(p.jumlah);
+  return 0;
+}
+function pjMetode(p){ return String((p&&p.metode)||'tunai').toLowerCase(); }
 function num(v){ const n=Number(String(v==null?'':v).replace(',','.')); return isNaN(n)?0:n; }
 function rp(n){ n=Math.round(num(n)); return 'Rp '+String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function rpAngka(n){ n=Math.round(num(n)); return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
@@ -1667,7 +1692,7 @@ function localHandle(action, p){
     }
     case 'dashboard':{
       const today=todayStr();
-      const pj=d.penjualan.filter(r=>String(r.tanggal).slice(0,10)===today);
+      const pj=(d.penjualan||[]).filter(r=>tglLokal(r.tanggal)===today && !pjBatal(r));
       const omzet=pj.reduce((s,r)=>s+num(r.total),0);
       const produk=d.produk.filter(x=>Number(x.aktif)===1);
       const menipis=produk.filter(x=>num(x.stok)<=num(x.stok_min));
@@ -2634,7 +2659,7 @@ async function refreshDash(){
     const d=await API('dashboard');
     const me=STATE.user||{};
     const today=todayStr();
-    const mine=(STATE.data.penjualan||[]).filter(p=>String(p.tanggal).slice(0,10)===today && p.status!=='batal' && String(p.user_id||'')===String(me.id||''));
+    const mine=(STATE.data.penjualan||[]).filter(p=>tglLokal(p.tanggal)===today && !pjBatal(p) && sameKasir(p, me.id));
     const omzetSaya=mine.reduce((s,p)=>s+num(p.total),0);
     document.getElementById('topStats').innerHTML=
       '<span class="chip">Kasir <b>'+esc(me.nama||me.username||'-')+'</b></span>'+
@@ -3341,11 +3366,9 @@ async function prosesBayar(){
       closeModal(); struk(preview); clearCart(); renderProdukKasir(); refreshDash();
       toast('Struk siap');
       window._bayarLock=false;
+      catatPenjualanState(preview, payload, t);
       API('penjualan', payload).then(function(res){
-        if(res){
-          STATE.data.penjualan=STATE.data.penjualan||[];
-          STATE.data.penjualan.unshift(res);
-        }
+        catatPenjualanState(res||preview, payload, t);
         toast('Transaksi '+(res&&res.nomor?res.nomor:preview.nomor)+' tersimpan');
       }).catch(function(e){
         STATE.cart=(snap||[]).concat(STATE.cart||[]);
@@ -3358,12 +3381,9 @@ async function prosesBayar(){
     }
     toast('Menyimpan transaksi…');
     const res=await API('penjualan', payload);
+    catatPenjualanState(res, payload, t);
     if(useRemote()){
       applyCartStock(STATE.cart, -1);
-      if(res){
-        STATE.data.penjualan=STATE.data.penjualan||[];
-        STATE.data.penjualan.unshift(res);
-      }
       applyHutangUi(metode, t.total, bayar, pelanggan_id, 1);
     }
     closeModal();
@@ -4302,7 +4322,7 @@ async function renderLaporan(){
 
 
 function inRangeTgl(tgl, from, to){
-  var d=String(tgl||'').slice(0,10);
+  var d=tglLokal(tgl);
   if(from && d<from) return false;
   if(to && d>to) return false;
   return true;
@@ -5784,46 +5804,54 @@ function tkKasirId(){
   return (STATE.user && STATE.user.id) || '';
 }
 function sameKasir(row, uid){
-  if(!uid) return true;
-  return String(row.user_id||'')===String(uid);
+  if(!uid || uid==='semua') return true;
+  var rid=String((row&&(row.user_id||row.kasir_id||row.userId))||'');
+  if(!rid) return uid===String(STATE.user&&STATE.user.id||'');
+  return rid===String(uid);
 }
 function fillTkKasir(){
   var sel=document.getElementById('tkKasir'); if(!sel) return;
   var me=STATE.user||{};
   var isAdmin=me.role==='admin';
-  var cur=sel.value || me.id || '';
+  var cur=sel.value || '';
   var users=(STATE.data.user||[]).filter(u=>Number(u.aktif)!==0);
   if(!users.length && me.id) users=[{id:me.id,nama:me.nama,role:me.role,aktif:1}];
-  sel.innerHTML=users.map(u=>'<option value="'+u.id+'">'+esc(u.nama||u.username)+'</option>').join('');
+  var opts=isAdmin?'<option value="semua">Semua kasir</option>':'';
+  opts+=users.map(u=>'<option value="'+u.id+'">'+esc(u.nama||u.username)+'</option>').join('');
+  sel.innerHTML=opts;
   if(!isAdmin){ sel.value=me.id; sel.disabled=true; }
   else {
     sel.disabled=false;
-    sel.value = users.some(u=>String(u.id)===String(cur)) ? cur : (me.id || (users[0]&&users[0].id) || '');
+    if(cur && (cur==='semua' || users.some(function(u){ return String(u.id)===String(cur); }))) sel.value=cur;
+    else sel.value='semua';
   }
 }
 function omsetHari(tgl, uid){
-  var masuk=0;
-  (STATE.data.penjualan||[]).filter(p=>String(p.tanggal).slice(0,10)===tgl && p.status!=='batal' && sameKasir(p,uid)).forEach(p=>{
-    var m=String(p.metode||'tunai').toLowerCase();
-    if(m==='tunai') masuk+=num(p.bayar||p.total);
-    else if(m==='campuran') masuk+=num(p.bayar);
-  });
-  (STATE.data.hutang||[]).filter(h=>h.jenis==='cicilan' && String(h.tanggal).slice(0,10)===tgl && sameKasir(h,uid)).forEach(h=>{ masuk+=num(h.jumlah); });
-  return roundM(masuk);
+  return ringkasKasirHari(tgl, uid).tunai;
 }
 function pengeluaranHari(tgl, uid){
   var out=0;
-  (STATE.data.pembelian||[]).filter(b=>String(b.tanggal).slice(0,10)===tgl && sameKasir(b,uid)).forEach(b=>{ out+=num(b.total); });
-  (STATE.data.returJual||[]).filter(r=>String(r.tanggal).slice(0,10)===tgl && String(r.metode_refund||'tunai')!=='potong_hutang' && sameKasir(r,uid)).forEach(r=>{ out+=num(r.total); });
-  (STATE.data.kas||[]).filter(k=>k.jenis==='keluar' && String(k.tanggal).slice(0,10)===tgl && sameKasir(k,uid)).forEach(k=>{ out+=num(k.jumlah); });
+  (STATE.data.pembelian||[]).forEach(function(b){
+    if(tglLokal(b.tanggal)===tgl && sameKasir(b,uid)) out+=pjTotal(b);
+  });
+  (STATE.data.returJual||[]).forEach(function(r){
+    if(tglLokal(r.tanggal)!==tgl || !sameKasir(r,uid)) return;
+    if(String(r.metode_refund||'tunai')==='potong_hutang') return;
+    out+=pjTotal(r);
+  });
+  (STATE.data.kas||[]).forEach(function(k){
+    if(k.jenis==='keluar' && tglLokal(k.tanggal)===tgl && sameKasir(k,uid)) out+=num(k.jumlah);
+  });
   return roundM(out);
 }
 function lastTutupBefore(tgl, uid){
-  return (STATE.data.tutupKasir||[]).filter(x=>String(x.tanggal).slice(0,10)<tgl && sameKasir(x,uid))
-    .sort((a,b)=>String(b.tanggal).localeCompare(String(a.tanggal)))[0];
+  if(!uid || uid==='semua') return null;
+  return (STATE.data.tutupKasir||[]).filter(function(x){ return tglLokal(x.tanggal)<tgl && sameKasir(x,uid); })
+    .sort(function(a,b){ return String(b.tanggal).localeCompare(String(a.tanggal)); })[0];
 }
 function tutupByTgl(tgl, uid){
-  return (STATE.data.tutupKasir||[]).find(x=>String(x.tanggal).slice(0,10)===tgl && sameKasir(x,uid));
+  if(!uid || uid==='semua') return null;
+  return (STATE.data.tutupKasir||[]).find(function(x){ return tglLokal(x.tanggal)===tgl && sameKasir(x,uid); });
 }
 function pecahanTotal(){
   var s=0;
@@ -5858,22 +5886,23 @@ function pecahanLabel(p){
 function ringkasKasirHari(tgl, uid){
   var omset=0, tunai=0, kartu=0, diskon=0, nota=0, retur=0;
   (STATE.data.penjualan||[]).forEach(function(p){
-    if(String(p.tanggal).slice(0,10)!==tgl || p.status==='batal' || !sameKasir(p,uid)) return;
+    if(tglLokal(p.tanggal)!==tgl || pjBatal(p) || !sameKasir(p,uid)) return;
     nota+=1;
-    omset+=num(p.total);
+    var tot=pjTotal(p);
+    omset+=tot;
     diskon+=num(p.diskon);
-    var m=String(p.metode||'tunai').toLowerCase();
-    if(m==='tunai') tunai+=num(p.bayar!=null?p.bayar:p.total);
+    var m=pjMetode(p);
+    if(m==='tunai') tunai+=tot;
     else if(m==='campuran') tunai+=num(p.bayar);
-    else if(m==='qris'||m==='transfer'||m==='debit') kartu+=num(p.total);
+    else if(m==='qris'||m==='transfer'||m==='debit'||m==='kartu'||m==='nontunai') kartu+=tot;
   });
   (STATE.data.hutang||[]).forEach(function(h){
-    if(h.jenis==='cicilan' && String(h.tanggal).slice(0,10)===tgl && sameKasir(h,uid)) tunai+=num(h.jumlah);
+    if(h.jenis==='cicilan' && tglLokal(h.tanggal)===tgl && sameKasir(h,uid)) tunai+=num(h.jumlah);
   });
   (STATE.data.returJual||[]).forEach(function(r){
-    if(String(r.tanggal).slice(0,10)!==tgl || !sameKasir(r,uid)) return;
+    if(tglLokal(r.tanggal)!==tgl || !sameKasir(r,uid)) return;
     if(String(r.metode_refund||'tunai')==='potong_hutang') return;
-    retur+=num(r.total);
+    retur+=pjTotal(r);
   });
   return {omset:roundM(omset), tunai:roundM(tunai), kartu:roundM(kartu), diskon:roundM(diskon), nota:nota, retur:roundM(retur)};
 }
@@ -5928,6 +5957,59 @@ function hitungTutup(){
     rincian:bacaPecahan(), items:tkKeluarItems()
   };
 }
+function gabungById(key, rows){
+  if(!Array.isArray(rows) || !rows.length) return;
+  var cur=STATE.data[key]||[];
+  var map={};
+  cur.forEach(function(r,i){ map[String(r.id||r.nomor||'')]=i; });
+  rows.forEach(function(r){
+    var k=String(r.id||r.nomor||'');
+    if(!k){ cur.push(r); return; }
+    if(map[k]!=null) cur[map[k]]=Object.assign({}, cur[map[k]], r);
+    else { map[k]=cur.length; cur.push(r); }
+  });
+  STATE.data[key]=cur;
+}
+async function muatTransaksiHari(tgl){
+  if(!useRemote()) return;
+  var from=tglGeser(tgl, -1);
+  try{
+    var pj=await API('getPenjualan', {from:from, to:tgl});
+    if(Array.isArray(pj)) gabungById('penjualan', pj);
+  }catch(e){}
+  try{
+    var rj=await API('getReturPenjualan', {from:from, to:tgl});
+    if(Array.isArray(rj)) gabungById('returJual', rj);
+  }catch(e){}
+  try{
+    var pb=await API('getPembelian', {from:from, to:tgl});
+    if(Array.isArray(pb)) gabungById('pembelian', pb);
+  }catch(e){}
+}
+function catatPenjualanState(res, payload, tot){
+  if(!res) return;
+  var row=Object.assign({}, res, {
+    id:res.id,
+    nomor:res.nomor,
+    tanggal:res.tanggal||nowIso(),
+    pelanggan_id:res.pelanggan_id||(payload&&payload.pelanggan_id),
+    user_id:res.user_id||res.kasir_id||(STATE.user&&STATE.user.id),
+    subtotal:res.subtotal!=null?res.subtotal:(tot&&tot.sub),
+    diskon:res.diskon!=null?res.diskon:(payload&&payload.diskon),
+    total:res.total!=null?res.total:(tot&&tot.total),
+    bayar:res.bayar!=null?res.bayar:(payload&&payload.bayar),
+    metode:res.metode||(payload&&payload.metode)||'tunai',
+    status:res.status||'selesai',
+    catatan:res.catatan||(payload&&payload.catatan)||''
+  });
+  if(!row.id && !row.nomor) return;
+  STATE.data.penjualan=STATE.data.penjualan||[];
+  var i=STATE.data.penjualan.findIndex(function(x){
+    return (row.id && String(x.id)===String(row.id)) || (row.nomor && String(x.nomor)===String(row.nomor));
+  });
+  if(i>=0) STATE.data.penjualan[i]=Object.assign({}, STATE.data.penjualan[i], row);
+  else STATE.data.penjualan.unshift(row);
+}
 async function renderTutupKasir(){
   await ensureLedger();
   try{
@@ -5939,6 +6021,7 @@ async function renderTutupKasir(){
   const tglEl=document.getElementById('tkTgl');
   if(!tglEl.value) tglEl.value=todayStr();
   const tgl=tglEl.value;
+  try{ await muatTransaksiHari(tgl); }catch(e){}
   fillTkKasir();
   const uid=tkKasirId();
   const isAdmin=STATE.user&&STATE.user.role==='admin';
@@ -5974,6 +6057,13 @@ async function renderTutupKasir(){
     '<div><span>Jumlah Nota :</span><b>'+stat.nota+'</b></div>'+
     '<div><span>Kartu :</span><b>'+rp(stat.kartu)+'</b></div>'+
     '<div><span>Diskon :</span><b>'+rp(stat.diskon)+'</b></div>';
+  var sh=document.getElementById('tkSyncHint');
+  if(sh){
+    var nAll=(STATE.data.penjualan||[]).filter(function(p){ return tglLokal(p.tanggal)===tgl && !pjBatal(p); }).length;
+    if(stat.nota) sh.textContent=stat.nota+' nota kasir ini, omset '+rp(stat.omset)+'.';
+    else if(nAll) sh.textContent='Ada '+nAll+' nota di tanggal ini, tapi bukan kasir yang dipilih. Pilih Semua kasir atau kasir yang berjualan.';
+    else sh.textContent='Belum ada penjualan di tanggal ini. Jual di kasir dulu, lalu buka tutup kasir / Hitung ulang.';
+  }
   renderTkKeluar(rin._pengeluaran||[]);
   const kh=document.getElementById('tkKeluarHint');
   if(kh) kh.textContent=window._tkKeluar?('Tercatat sistem (pembelian/retur/kas): '+rp(window._tkKeluar)+'. Tidak otomatis masuk; isi manual jika perlu.'):'Isi deskripsi dan nilai. Baris kosong diabaikan.';
@@ -5988,7 +6078,8 @@ async function renderTutupKasir(){
   else st.textContent='SUBTOTAL = saldo awal + saldo tambahan + tunai. Setoran = subtotal − pengeluaran − modal besok.';
   const btn=document.getElementById('tkSimpanBtn');
   if(btn){
-    if(saved && !isAdmin){ btn.disabled=true; btn.textContent='Sudah ditutup (hanya admin yang boleh ubah)'; }
+    if(uid==='semua'){ btn.disabled=true; btn.textContent='Pilih kasir untuk simpan'; }
+    else if(saved && !isAdmin){ btn.disabled=true; btn.textContent='Sudah ditutup (hanya admin yang boleh ubah)'; }
     else { btn.disabled=false; btn.textContent=saved?'Perbarui tutup kasir':'Simpan tutup kasir'; }
   }
   hitungTutup();
@@ -6006,6 +6097,7 @@ async function simpanTutupKasir(){
   const isAdmin=STATE.user&&STATE.user.role==='admin';
   let uidk=tkKasirId();
   if(!isAdmin) uidk=(STATE.user&&STATE.user.id)||uidk;
+  if(!uidk || uidk==='semua') return toast('Pilih kasir dulu untuk simpan tutup kasir');
   const saved=tutupByTgl(tgl, uidk);
   if(saved && !isAdmin) return toast('Anda sudah tutup kasir hari ini. Minta admin jika perlu diubah.');
   if(!isAdmin && !saved){
@@ -6113,5 +6205,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a382b9e92fb44ac7',t:'MTc4ODkyMDU1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
