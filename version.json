@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.44",
-  "tanggal": "2026-09-08",
-  "catatan": "Struk penjualan: No.inv dan Tanggal/waktu, titik dua lurus dengan Kasir dan Pelanggan."
+  "version": "2026.09.06.45",
+  "tanggal": "2026-09-09",
+  "catatan": "Tutup kasir dirapikan seperti form saldo kasir: pengeluaran manual, modal besok, setoran."
 }
