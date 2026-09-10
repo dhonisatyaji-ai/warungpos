@@ -1046,7 +1046,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.56';
+const APP_VERSION = '2026.09.06.57';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2500,11 +2500,13 @@ async function applyPack(pack){
   STATE.data.penjualanItem=pack.penjualanItem||[]; STATE.data.pembelianItem=pack.pembelianItem||[];
   STATE.data.returJualItem=pack.returJualItem||[]; STATE.data.returBeliItem=pack.returBeliItem||[];
   STATE.data.hutang=pack.hutang||[];
+  try{ gabungSupplierDuplikat(); }catch(e){}
 }
 async function loadOneRemote(key, action, arg, fallback){
   try {
     var r = await API(action, arg||{});
     if (r != null) STATE.data[key] = r;
+    if(key==='supplier') try{ gabungSupplierDuplikat(); }catch(e2){}
   } catch(e) {
     if (fallback !== undefined && STATE.data[key] == null) STATE.data[key] = fallback;
   }
@@ -3613,7 +3615,8 @@ function openProdukDariBeli(){
 }
 function openProduk(id, opt){
   opt=opt||{};
-  const defSup=opt.supplier_id || (STATE.data.supplier[0]&&STATE.data.supplier[0].id);
+  const sups=supplierAktifUnik();
+  const defSup=opt.supplier_id || (sups[0]&&sups[0].id);
   const defKat=STATE.data.kategori[0]&&STATE.data.kategori[0].id;
   const p=id?find(STATE.data.produk,id):{sku:'',barcode:'',nama:'',kategori_id:defKat,jenis_id:'J1',supplier_id:defSup,satuan:'pcs',harga_beli:0,harga_jual:0,harga_dingin:0,stok:0,stok_min:0};
   if(!p) return toast('Produk tidak ada');
@@ -3623,7 +3626,7 @@ function openProduk(id, opt){
     '<div class="two"><div><label class="fld">Barcode</label><input id="fBar" value="'+esc(p.barcode||'')+'" placeholder="Opsional, unik"></div><div><label class="fld">Satuan</label><select id="fSat"><option>pcs</option><option>kg</option><option>gram</option><option>liter</option><option>ml</option><option>pack</option><option>dus</option></select></div></div>'+
     '<div class="three"><div><label class="fld">Kategori</label><select id="fKat">'+STATE.data.kategori.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
     '<div><label class="fld">Jenis</label><select id="fJen">'+STATE.data.jenis.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div>'+
-    '<div><label class="fld">Supplier</label><select id="fSup">'+STATE.data.supplier.map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div></div>'+
+    '<div><label class="fld">Supplier</label><select id="fSup">'+supplierAktifUnik().map(k=>'<option value="'+k.id+'">'+esc(k.nama)+'</option>').join('')+'</select></div></div>'+
     '<div class="three"><div><label class="fld">Harga beli</label><input id="fHb" type="number" value="'+num(p.harga_beli)+'"></div>'+
     '<div><label class="fld">Harga jual / biasa</label><input id="fHj" type="number" value="'+num(p.harga_jual)+'"></div>'+
     '<div><label class="fld">Harga dingin</label><input id="fHd" type="number" value="'+num(p.harga_dingin)+'"></div></div>'+
@@ -3753,7 +3756,7 @@ function onBeliProduk(){
   else if(p && h) h.value=num(p.harga_beli);
 }
 function renderBeliForm(){
-  const list=STATE.data.supplier.filter(s=>Number(s.aktif)!==0);
+  const list=supplierAktifUnik();
   const pick=document.getElementById('beliSupPick');
   if(pick){
     pick.innerHTML=list.map(s=>{
@@ -4124,11 +4127,12 @@ function hapusPromo(id){
   saveDB(); renderPromo(); toast('Promo dihapus');
 }
 function normNamaSup(s){
-  return String(s||'').trim().replace(/\s+/g,' ').toLowerCase();
+  return String(s||'').replace(/\u00a0/g,' ').trim().replace(/\s+/g,' ').toLowerCase();
 }
 function reassignSupplier(fromId, toId){
-  (STATE.data.produk||[]).forEach(function(p){ if(String(p.supplier_id)===String(fromId)) p.supplier_id=toId; });
-  (STATE.data.pembelian||[]).forEach(function(b){ if(String(b.supplier_id)===String(fromId)) b.supplier_id=toId; });
+  fromId=String(fromId); toId=String(toId||'');
+  (STATE.data.produk||[]).forEach(function(p){ if(String(p.supplier_id)===fromId) p.supplier_id=toId; });
+  (STATE.data.pembelian||[]).forEach(function(b){ if(String(b.supplier_id)===fromId) b.supplier_id=toId; });
 }
 function gabungSupplierDuplikat(){
   const list=STATE.data.supplier||[];
@@ -4140,13 +4144,18 @@ function gabungSupplierDuplikat(){
     groups[k].push(s);
   });
   let n=0;
+  var dropAll=[];
   Object.keys(groups).forEach(function(k){
     const g=groups[k];
     if(g.length<2) return;
     g.sort(function(a,b){
+      var aa=(a.aktif===0||a.aktif==='0')?1:0;
+      var ba=(b.aktif===0||b.aktif==='0')?1:0;
+      if(aa!==ba) return aa-ba;
       const na=(STATE.data.produk||[]).filter(function(p){ return String(p.supplier_id)===String(a.id); }).length;
       const nb=(STATE.data.produk||[]).filter(function(p){ return String(p.supplier_id)===String(b.id); }).length;
-      return nb-na;
+      if(nb!==na) return nb-na;
+      return String(a.id).localeCompare(String(b.id));
     });
     const keep=g[0];
     for(var i=1;i<g.length;i++){
@@ -4154,13 +4163,29 @@ function gabungSupplierDuplikat(){
       if(!keep.telp && s.telp) keep.telp=s.telp;
       if(!keep.alamat && s.alamat) keep.alamat=s.alamat;
       reassignSupplier(s.id, keep.id);
+      dropAll.push(String(s.id));
       n++;
     }
-    const drop=g.slice(1).map(function(s){ return s.id; });
-    STATE.data.supplier=(STATE.data.supplier||[]).filter(function(s){ return drop.indexOf(s.id)<0; });
   });
-  if(n) saveDB();
+  if(n){
+    STATE.data.supplier=(STATE.data.supplier||[]).filter(function(s){ return dropAll.indexOf(String(s.id))<0; });
+    try{ saveDB(); }catch(e){}
+    dropAll.forEach(function(id){
+      try{ API('deleteSupplier', {id:id}); }catch(e){}
+    });
+  }
   return n;
+}
+function supplierAktifUnik(){
+  try{ gabungSupplierDuplikat(); }catch(e){}
+  var seen={};
+  return (STATE.data.supplier||[]).filter(function(s){
+    if(s.aktif===0 || s.aktif==='0') return false;
+    var k=normNamaSup(s.nama);
+    if(!k || seen[k]) return false;
+    seen[k]=1;
+    return true;
+  });
 }
 function renderSupplier(){
   const n=gabungSupplierDuplikat();
@@ -6290,6 +6315,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter' && document.getElementById('loginPass')===document.activeElement) doLogin();
 });
 STATE.data=loadDB();
+try{ gabungSupplierDuplikat(); }catch(e){}
 (function boot(){
   try {
     ['navbar','navbar-iframe','cookieChoiceInfo','Attribution1'].forEach(function(id){
@@ -6317,5 +6343,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b404b3d029d6f',t:'MTc4OTAwOTk0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b57afad4edf93',t:'MTc4OTAxMDkwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
