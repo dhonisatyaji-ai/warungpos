@@ -1046,7 +1046,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.54';
+const APP_VERSION = '2026.09.06.55';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3625,8 +3625,8 @@ function openProduk(id, opt){
     '<div class="three"><div><label class="fld">Harga beli</label><input id="fHb" type="number" value="'+num(p.harga_beli)+'"></div>'+
     '<div><label class="fld">Harga jual / biasa</label><input id="fHj" type="number" value="'+num(p.harga_jual)+'"></div>'+
     '<div><label class="fld">Harga dingin</label><input id="fHd" type="number" value="'+num(p.harga_dingin)+'"></div></div>'+
-    '<div class="two"><div><label class="fld">Stok</label><input id="fStok" type="number" step="0.01" value="'+num(p.stok)+'"></div><div><label class="fld">Stok minimum</label><input id="fMin" type="number" step="0.01" value="'+num(p.stok_min)+'"></div></div>'+
-    '<p class="hint">SKU otomatis dari kategori dan tidak boleh kembar. Barcode opsional, unik. Jenis Minuman: harga biasa & dingin. Jenis Berat: harga per kg/liter.</p>'+
+    (id?'<div class="two"><div><label class="fld">Stok</label><input id="fStok" type="number" step="0.01" value="'+num(p.stok)+'"></div><div><label class="fld">Stok minimum</label><input id="fMin" type="number" step="0.01" value="'+num(p.stok_min)+'"></div></div>':'')+
+    '<p class="hint">SKU otomatis dari kategori dan tidak boleh kembar. Barcode opsional, unik. Stok awal diisi lewat pembelian. Jenis Minuman: harga biasa & dingin. Jenis Berat: harga per kg/liter.</p>'+
     '<button class="btn full" style="margin-top:10px" onclick=\'simpanProduk('+(id?JSON.stringify(id):'null')+')\'>Simpan</button>');
   setTimeout(()=>{
     document.getElementById('fSat').value=p.satuan||'pcs';
@@ -3646,7 +3646,11 @@ async function simpanProduk(id){
   if(!old || String(old.kategori_id||'')!==String(kid||'')) sku=skuUnikAtauNaik(nextSkuForKategori(kid), id||undefined);
   else sku=skuUnikAtauNaik(val('fSku'), id||undefined);
   const skuEl=document.getElementById('fSku'); if(skuEl && skuEl.value!==sku) skuEl.value=sku;
-  const payload={id:id||undefined,nama:val('fNama'),sku:sku,barcode:val('fBar'),satuan:val('fSat'),kategori_id:val('fKat'),jenis_id:val('fJen'),supplier_id:val('fSup'),harga_beli:val('fHb'),harga_jual:val('fHj'),harga_dingin:val('fHd'),stok:val('fStok'),stok_min:val('fMin'),aktif:1};
+  const payload={id:id||undefined,nama:val('fNama'),sku:sku,barcode:val('fBar'),satuan:val('fSat'),kategori_id:val('fKat'),jenis_id:val('fJen'),supplier_id:val('fSup'),harga_beli:val('fHb'),harga_jual:val('fHj'),harga_dingin:val('fHd'),aktif:1};
+  if(document.getElementById('fStok')) payload.stok=val('fStok');
+  else payload.stok=old?old.stok:0;
+  if(document.getElementById('fMin')) payload.stok_min=val('fMin');
+  else payload.stok_min=old?old.stok_min:0;
   if(!payload.nama) return toast('Nama produk wajib');
   if(payload.barcode){
     const barHit=(STATE.data.produk||[]).find(function(x){ return String(x.barcode||'')===String(payload.barcode) && x.id!==id; });
@@ -6286,5 +6290,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b06b0c9445fb4',t:'MTc4OTAwNzU4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b168baf212035',t:'MTc4OTAwODIzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
