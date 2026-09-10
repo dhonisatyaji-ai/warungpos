@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.47",
+  "version": "2026.09.06.49",
   "tanggal": "2026-09-09",
-  "catatan": "Struk penjualan dan tutup kasir: nama toko dan alamat di tengah."
+  "catatan": "Kartu produk kasir: nama/harga/stok tidak keluar kolom."
 }
