@@ -183,14 +183,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .grid{display:flex;flex-direction:column;gap:5px}
 .pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 10px;text-align:left;
   box-shadow:0 1px 0 #fff inset;width:100%;max-width:100%;min-width:0;
-  font:inherit;color:inherit;display:grid;align-items:center;gap:8px 12px;
-  grid-template-columns:36px minmax(108px,1.4fr) minmax(92px,0.8fr) max-content max-content}
+  font:inherit;color:inherit;display:grid;align-items:center;column-gap:10px;
+  grid-template-columns:36px minmax(0,1fr) 108px 128px 168px 86px}
 .pcard:hover{border-color:var(--gold);background:#fffdf8}
 .pcard .ava{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff}
 .pcard h4{margin:0;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.pcard .meta{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;white-space:nowrap;text-align:right}
-.pcard .stok{font-size:11px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:3px 8px;white-space:nowrap;text-align:center}
+.pcard .jenis,.pcard .kat{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.pcard .stok{font-size:11px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:3px 8px;white-space:nowrap;text-align:center;justify-self:end}
 .pcard .stok.low{background:#fff7ed;color:#9a3412}
 .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#fef3c7;color:#92400e;margin-right:4px}
 
@@ -1045,7 +1045,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.51';
+const APP_VERSION = '2026.09.06.52';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2829,11 +2829,15 @@ function renderProdukKasir(){
       const hs=(prB.tingkat||[]).map(function(x){ return num(x.harga); }).filter(function(x){ return x>0; });
       if(hs.length) harga='dari '+rp(Math.min.apply(null,hs));
     }
-    var katTxt=(j.kode==='minuman'?'<span class="badge">MINUMAN</span>':'')+(j.kode==='berat'?'<span class="badge">BERAT</span>':'')+(produkPunyaPromo(p.id)?'<span class="badge promo">PROMO</span>':'')+esc(k.nama);
+    var jenisBadge='';
+    if(j.kode==='minuman') jenisBadge='<span class="badge">MINUMAN</span>';
+    else if(j.kode==='berat') jenisBadge='<span class="badge">BERAT</span>';
+    if(produkPunyaPromo(p.id)) jenisBadge+='<span class="badge promo">PROMO</span>';
     return '<button class="pcard" onclick=\'pilihProduk('+JSON.stringify(p.id)+')\'>'+
       '<div class="ava" style="background:'+k.warna+'">'+(p.nama[0]||'?')+'</div>'+
       '<h4>'+esc(p.nama)+'</h4>'+
-      '<div class="meta">'+katTxt+'</div>'+
+      '<div class="jenis">'+jenisBadge+'</div>'+
+      '<div class="kat">'+esc(k.nama||'')+'</div>'+
       '<div class="price">'+harga+'</div>'+
       '<span class="stok '+(low?'low':'')+'">'+fmtQty(p.stok,p.satuan)+'</span></button>';
   }).join('') || '<div class="empty">Produk tidak ditemukan</div>';
@@ -6224,5 +6228,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38ace174fc0df8f',t:'MTc4OTAwNTI2OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38ad7e23899c189',t:'MTc4OTAwNTY3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
