@@ -180,17 +180,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cats{display:flex;gap:6px;overflow:auto;padding-bottom:8px;margin-bottom:8px}
 .cat{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px}
 .cat.active{background:var(--forest);color:#fff;border-color:var(--forest)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,158px),1fr));gap:10px}
-.pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;padding-right:12px;text-align:left;
-  box-shadow:0 1px 0 #fff inset;position:relative;min-height:132px;width:100%;max-width:100%;min-width:0;overflow:hidden;
-  font:inherit;color:inherit}
-.pcard:hover{border-color:var(--gold);transform:translateY(-1px)}
-.pcard .ava{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff;margin-bottom:8px}
-.pcard h4{margin:0 0 4px;margin-right:4px;font-size:14px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
-.pcard .meta{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pcard .price{margin-top:8px;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;overflow-wrap:anywhere;word-break:break-word}
-.pcard .price-alt{display:block;font-size:12px;font-weight:700;color:var(--forest-2)}
-.pcard .stok{position:absolute;top:10px;right:8px;font-size:10px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:2px 6px;max-width:calc(100% - 52px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid{display:flex;flex-direction:column;gap:6px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:left;
+  box-shadow:0 1px 0 #fff inset;position:relative;width:100%;max-width:100%;min-width:0;overflow:hidden;
+  font:inherit;color:inherit;display:flex;align-items:center;gap:10px}
+.pcard:hover{border-color:var(--gold);background:#fffdf8}
+.pcard .ava{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff;flex:none}
+.pcard .plist-mid{flex:1;min-width:0}
+.pcard h4{margin:0;font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .meta{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.pcard .plist-right{flex:none;text-align:right;max-width:42%}
+.pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.25;white-space:nowrap}
+.pcard .price-alt{display:block;font-size:11px;font-weight:700;color:var(--forest-2)}
+.pcard .stok{display:block;margin-top:3px;font-size:10px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:2px 6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pcard .stok.low{background:#fff7ed;color:#9a3412}
 .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#fef3c7;color:#92400e;margin-right:4px}
 
@@ -1045,7 +1047,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.49';
+const APP_VERSION = '2026.09.06.50';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2831,10 +2833,10 @@ function renderProdukKasir(){
     }
     return '<button class="pcard" onclick=\'pilihProduk('+JSON.stringify(p.id)+')\'>'+
       '<div class="ava" style="background:'+k.warna+'">'+(p.nama[0]||'?')+'</div>'+
-      '<span class="stok '+(low?'low':'')+'">'+fmtQty(p.stok,p.satuan)+'</span>'+
-      '<h4>'+esc(p.nama)+'</h4>'+
-      '<div class="meta">'+(j.kode==='minuman'?'<span class="badge">MINUMAN</span>':'')+(j.kode==='berat'?'<span class="badge">BERAT</span>':'')+(produkPunyaPromo(p.id)?'<span class="badge promo">PROMO</span>':'')+esc(k.nama)+'</div>'+
-      '<div class="price">'+harga+'</div></button>';
+      '<div class="plist-mid"><h4>'+esc(p.nama)+'</h4>'+
+      '<div class="meta">'+(j.kode==='minuman'?'<span class="badge">MINUMAN</span>':'')+(j.kode==='berat'?'<span class="badge">BERAT</span>':'')+(produkPunyaPromo(p.id)?'<span class="badge promo">PROMO</span>':'')+esc(k.nama)+'</div></div>'+
+      '<div class="plist-right"><div class="price">'+harga+'</div>'+
+      '<span class="stok '+(low?'low':'')+'">'+fmtQty(p.stok,p.satuan)+'</span></div></button>';
   }).join('') || '<div class="empty">Produk tidak ditemukan</div>';
 }
 function scanAdd(){
@@ -6223,5 +6225,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38aa2878dcd8938',t:'MTc4OTAwMzQ4NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38aae86bc79df7c',t:'MTc4OTAwMzk3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
