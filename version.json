@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.49",
+  "version": "2026.09.06.50",
   "tanggal": "2026-09-09",
-  "catatan": "Kartu produk kasir: nama/harga/stok tidak keluar kolom."
+  "catatan": "Kasir: daftar barang model list, bukan kotak."
 }
