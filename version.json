@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.52",
+  "version": "2026.09.06.53",
   "tanggal": "2026-09-09",
-  "catatan": "Kasir: kolom jenis, kategori, harga, stok lurus ke bawah."
+  "catatan": "Kasir: nama penuh 1 baris, jenis+kategori di bawah nama."
 }
