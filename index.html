@@ -181,14 +181,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cat{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px}
 .cat.active{background:var(--forest);color:#fff;border-color:var(--forest)}
 .grid{display:flex;flex-direction:column;gap:5px}
-.pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 10px;text-align:left;
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:left;
   box-shadow:0 1px 0 #fff inset;width:100%;max-width:100%;min-width:0;
   font:inherit;color:inherit;display:grid;align-items:center;column-gap:10px;
-  grid-template-columns:36px minmax(0,1fr) 108px 128px 168px 86px}
+  grid-template-columns:36px minmax(0,1fr) 168px 86px}
 .pcard:hover{border-color:var(--gold);background:#fffdf8}
 .pcard .ava{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff}
-.pcard h4{margin:0;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.pcard .jenis,.pcard .kat{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pcard .plist-mid{min-width:0}
+.pcard h4{margin:0;font-size:14px;line-height:1.3;white-space:normal;overflow:visible;word-break:break-word}
+.pcard .plist-sub{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:12px}
 .pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 .pcard .stok{font-size:11px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:3px 8px;white-space:nowrap;text-align:center;justify-self:end}
 .pcard .stok.low{background:#fff7ed;color:#9a3412}
@@ -1045,7 +1046,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.52';
+const APP_VERSION = '2026.09.06.53';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2835,9 +2836,8 @@ function renderProdukKasir(){
     if(produkPunyaPromo(p.id)) jenisBadge+='<span class="badge promo">PROMO</span>';
     return '<button class="pcard" onclick=\'pilihProduk('+JSON.stringify(p.id)+')\'>'+
       '<div class="ava" style="background:'+k.warna+'">'+(p.nama[0]||'?')+'</div>'+
-      '<h4>'+esc(p.nama)+'</h4>'+
-      '<div class="jenis">'+jenisBadge+'</div>'+
-      '<div class="kat">'+esc(k.nama||'')+'</div>'+
+      '<div class="plist-mid"><h4>'+esc(p.nama)+'</h4>'+
+      '<div class="plist-sub">'+jenisBadge+(k.nama?'<span>'+esc(k.nama)+'</span>':'')+'</div></div>'+
       '<div class="price">'+harga+'</div>'+
       '<span class="stok '+(low?'low':'')+'">'+fmtQty(p.stok,p.satuan)+'</span></button>';
   }).join('') || '<div class="empty">Produk tidak ditemukan</div>';
@@ -6228,5 +6228,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38ad7e23899c189',t:'MTc4OTAwNTY3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38ae74e5b8bce2e',t:'MTc4OTAwNjMwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
