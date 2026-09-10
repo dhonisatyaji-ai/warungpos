@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.55",
+  "version": "2026.09.06.56",
   "tanggal": "2026-09-10",
-  "catatan": "Produk baru: tanpa kolom stok dan stok minimum."
+  "catatan": "Setelah transaksi, kursor kembali ke pencarian produk."
 }
