@@ -1046,7 +1046,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.55';
+const APP_VERSION = '2026.09.06.56';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3376,6 +3376,7 @@ async function prosesBayar(){
       applyCartStock(snap, -1);
       applyHutangUi(metode, t.total, bayar, pelanggan_id, 1);
       closeModal(); struk(preview); clearCart(); renderProdukKasir(); refreshDash();
+      jadwalFokusCariKasir();
       toast('Struk siap');
       window._bayarLock=false;
       catatPenjualanState(preview, payload, t);
@@ -3402,6 +3403,7 @@ async function prosesBayar(){
     struk(res);
     clearCart();
     renderProdukKasir(); refreshDash();
+    jadwalFokusCariKasir();
     toast('Transaksi '+res.nomor+' tersimpan');
   }catch(e){ toast(e.message); }
   finally { window._bayarLock=false; }
@@ -6253,7 +6255,32 @@ function cetakTutupKasir(){
 
 /* ================= HELPERS ================= */
 function modal(html){ const bg=document.getElementById('modalBg'); bg.classList.add('show'); bg.innerHTML='<div class="modal">'+html+'<div style="text-align:right;margin-top:8px"><button class="btn-ghost btn-sm" onclick="closeModal()">Tutup</button></div></div>'; }
-function closeModal(){ document.getElementById('modalBg').classList.remove('show'); document.getElementById('modalBg').innerHTML=''; }
+function fokusCariKasir(){
+  try{
+    var i=document.getElementById('cariProduk');
+    if(!i) return;
+    i.value='';
+    i.focus();
+    if(typeof i.select==='function') i.select();
+  }catch(e){}
+}
+function jadwalFokusCariKasir(){
+  STATE._fokusCariKasir=true;
+  setTimeout(function(){
+    var bg=document.getElementById('modalBg');
+    if(bg && bg.classList.contains('show')) return;
+    fokusCariKasir();
+    STATE._fokusCariKasir=false;
+  }, 80);
+}
+function closeModal(){
+  var bg=document.getElementById('modalBg');
+  if(bg){ bg.classList.remove('show'); bg.innerHTML=''; }
+  if(STATE._fokusCariKasir){
+    STATE._fokusCariKasir=false;
+    setTimeout(fokusCariKasir, 30);
+  }
+}
 function val(id){ const el=document.getElementById(id); return el?el.value:''; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -6290,5 +6317,5 @@ STATE.data=loadDB();
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b168baf212035',t:'MTc4OTAwODIzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b404b3d029d6f',t:'MTc4OTAwOTk0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
