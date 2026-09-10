@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.56",
+  "version": "2026.09.06.57",
   "tanggal": "2026-09-10",
-  "catatan": "Setelah transaksi, kursor kembali ke pencarian produk."
+  "catatan": "Supplier kembar (besar/kecil) digabung otomatis di pembelian."
 }
