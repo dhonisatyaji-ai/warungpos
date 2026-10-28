@@ -1050,7 +1050,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.58';
+const APP_VERSION = '2026.09.06.59';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3470,9 +3470,76 @@ function buatStrukHtml(res){
     pay+
     '<hr class="dashline"><center>'+esc(set.toko_footer||'Terima kasih')+'</center></div>';
 }
+function waNomor(telp){
+  var s=String(telp||'').replace(/[^\d+]/g,'');
+  if(!s || s==='-' || s==='0') return '';
+  if(s.charAt(0)==='+') s=s.slice(1);
+  if(s.indexOf('00')===0) s=s.slice(2);
+  if(s.charAt(0)==='0') s='62'+s.slice(1);
+  else if(s.charAt(0)==='8') s='62'+s;
+  if(s.indexOf('62')!==0 || s.length<11 || s.length>15) return '';
+  return s;
+}
+function buatStrukTeks(res){
+  var set=(STATE.data&&STATE.data.pengaturan)||{};
+  var pl=find(STATE.data.pelanggan,res.pelanggan_id);
+  var kasir=(find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'';
+  var line='------------------------------';
+  var out=[];
+  out.push('*'+String(set.toko_nama||'WarungPOS')+'*');
+  if(set.toko_alamat) out.push(String(set.toko_alamat));
+  if(set.toko_telp) out.push(String(set.toko_telp));
+  out.push(line);
+  if(String(res.status)==='batal') out.push('*BATAL*');
+  out.push('No.inv : '+String(res.nomor||'-'));
+  out.push('Tanggal/waktu : '+strukWaktu(res.tanggal));
+  out.push('Kasir : '+kasir);
+  out.push('Pelanggan : '+(pl?pl.nama:'-'));
+  out.push(line);
+  (res.items||[]).forEach(function(it){
+    var nm=String(it.nama_produk||'');
+    if(Number(it.is_dingin)) nm+=' (Dingin)';
+    else if(find(STATE.data.produk,it.produk_id) && jenisKode(find(STATE.data.produk,it.produk_id))==='minuman') nm+=' (Biasa)';
+    if(it.mode_berat==='nominal') nm+=' · '+fmtQty(it.qty,it.satuan)+' (nom '+rp(it.nominal)+')';
+    else if(it.mode_berat) nm+=' · '+fmtQty(it.qty,it.satuan);
+    out.push(nm);
+    out.push(fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'  '+rp(it.subtotal));
+  });
+  out.push(line);
+  out.push('Subtotal : '+rp(res.subtotal));
+  if(num(res.diskon)) out.push('Diskon / promo : '+rp(res.diskon));
+  out.push('*Total : '+rp(res.total)+'*');
+  out.push('Metode : '+metodeLabel(res.metode));
+  if(res.metode==='tunai'){
+    out.push('Bayar : '+rp(res.bayar));
+    out.push('Kembali : '+rp(res.kembalian));
+  } else if(isNonTunai(res.metode)){
+    out.push('Bayar : '+rp(res.bayar||res.total));
+  } else if(res.metode==='hutang'){
+    out.push('Hutang : '+rp(res.total));
+  } else if(res.metode==='campuran'){
+    out.push('Bayar : '+rp(res.bayar));
+    out.push('Hutang : '+rp(roundM(num(res.total)-num(res.bayar))));
+  }
+  out.push(line);
+  out.push(set.toko_footer||'Terima kasih');
+  return out.join('\n');
+}
+function shareStrukWa(){
+  var res=window._strukLast;
+  if(!res) return toast('Tidak ada struk');
+  var teks=buatStrukTeks(res);
+  var pl=find(STATE.data.pelanggan, res.pelanggan_id);
+  var hp=waNomor(pl && pl.telp);
+  var url='https://wa.me/'+(hp||'')+'?text='+encodeURIComponent(teks);
+  try{ window.open(url, '_blank', 'noopener'); }
+  catch(e){ location.href=url; }
+}
 function struk(res){
+  window._strukLast=res;
   const inner=buatStrukHtml(res);
   let btns='<button class="btn" type="button" onclick="printStruk()">Cetak struk</button>';
+  btns+='<button class="btn-ghost" type="button" onclick="shareStrukWa()">WhatsApp</button>';
   if(bisaBatalPj(res)) btns+='<button class="btn-ghost" type="button" data-batal-id="'+esc(String(res.id||''))+'">Batalkan</button>';
   modal(inner+'<div class="row-btns" style="margin-top:10px">'+btns+'</div>');
   const b=document.querySelector('#modalBg [data-batal-id]');
@@ -6431,5 +6498,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51abd63cd4efd07',t:'MTc5MzE5ODg4OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
