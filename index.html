@@ -193,6 +193,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 .pcard .stok{font-size:11px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:3px 8px;white-space:nowrap;text-align:center;justify-self:end}
 .pcard .stok.low{background:#fff7ed;color:#9a3412}
+.stok-cek{width:18px!important;height:18px;padding:0!important;flex:none;accent-color:var(--forest)}
+.gabung-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:8px 0;cursor:pointer;background:#fff}
+.gabung-row input{width:18px!important;height:18px;padding:0!important;margin-top:3px;flex:none;accent-color:var(--forest)}
 .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#fef3c7;color:#92400e;margin-right:4px}
 
 .cart{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;position:relative;
@@ -601,12 +604,13 @@ html.has-session .boot-splash:not(.hide){display:grid}
       <div class="toolbar">
         <input id="cariStok" placeholder="Cari produk…" oninput="renderStok()" style="max-width:240px">
         <button class="btn-sm cat" id="btnStokLow" onclick="toggleStokLow()">Stok menipis</button>
+        <button class="btn-ghost" type="button" onclick="bukaGabungProduk()">Gabungkan</button>
         <button class="btn right" onclick="openProduk()">+ Produk baru</button>
       </div>
       <div id="stokProdukBox">
         <div class="dash" id="stokDash"></div>
         <div class="table-wrap"><table><thead><tr>
-          <th>SKU</th><th>Barcode</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
+          <th></th><th>SKU</th><th>Barcode</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
         </tr></thead><tbody id="stokBody"></tbody></table></div>
       </div>
     </div>
@@ -1046,7 +1050,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.57';
+const APP_VERSION = '2026.09.06.58';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3570,10 +3574,94 @@ function renderStok(){
   }).map(p=>{
     const j=find(STATE.data.jenis,p.jenis_id)||{}; const k=find(STATE.data.kategori,p.kategori_id)||{};
     const low=num(p.stok)<=num(p.stok_min);
-    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
+    return '<tr><td><input type="checkbox" class="stok-cek" data-pid="'+esc(String(p.id))+'"></td><td>'+esc(p.sku)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
       '<button class="btn-sm btn-ghost" onclick=\'openProduk('+JSON.stringify(p.id)+')\'>Ubah</button> '+
       '<button class="btn-sm btn-ghost" onclick=\'openAdjust('+JSON.stringify(p.id)+')\'>Stok</button></td></tr>';
-  }).join('')||'<tr><td colspan="9" class="muted">Tidak ada produk</td></tr>';
+  }).join('')||'<tr><td colspan="10" class="muted">Tidak ada produk</td></tr>';
+}
+function stokCekIds(){
+  var ids=[];
+  document.querySelectorAll('#stokBody .stok-cek:checked').forEach(function(el){
+    var id=el.getAttribute('data-pid');
+    if(id) ids.push(id);
+  });
+  return ids;
+}
+function reassignProdukId(fromId, toId, namaBaru){
+  fromId=String(fromId); toId=String(toId);
+  function walk(arr){
+    (arr||[]).forEach(function(x){
+      if(String(x.produk_id)===fromId){
+        x.produk_id=toId;
+        if(namaBaru && x.nama_produk) x.nama_produk=namaBaru;
+      }
+    });
+  }
+  walk(STATE.data.penjualanItem);
+  walk(STATE.data.pembelianItem);
+  walk(STATE.data.returJualItem);
+  walk(STATE.data.returBeliItem);
+  walk(STATE.data.opnameItem);
+  (STATE.cart||[]).forEach(function(it){ if(String(it.produk_id)===fromId) it.produk_id=toId; });
+  (STATE.beli||[]).forEach(function(it){ if(String(it.produk_id)===fromId) it.produk_id=toId; });
+  (STATE.data.promo||[]).forEach(function(pr){
+    if(String(pr.produk_id||'')===fromId) pr.produk_id=toId;
+    (pr.items||[]).forEach(function(it){ if(String(it.produk_id)===fromId) it.produk_id=toId; });
+  });
+  try{
+    var drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||'[]')||[];
+    drafts.forEach(function(d){
+      (d.cart||[]).forEach(function(it){ if(String(it.produk_id)===fromId) it.produk_id=toId; });
+    });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  }catch(e){}
+}
+function bukaGabungProduk(){
+  var ids=stokCekIds();
+  if(ids.length<2) return toast('Ceklis minimal 2 produk yang mau digabung');
+  var list=ids.map(function(id){ return find(STATE.data.produk,id); }).filter(Boolean);
+  if(list.length<2) return toast('Produk tidak ditemukan');
+  list.sort(function(a,b){ return String(b.nama||'').length-String(a.nama||'').length; });
+  var rows=list.map(function(p,i){
+    return '<label class="gabung-row"><input type="radio" name="gabungKeep" value="'+esc(String(p.id))+'"'+(i===0?' checked':'')+'>'+
+      '<span><b>'+esc(p.nama)+'</b><br><span class="muted">'+esc(p.sku||'-')+(p.barcode?(' · '+esc(p.barcode)):'')+' · stok '+fmtQty(p.stok,p.satuan)+'</span></span></label>';
+  }).join('');
+  modal('<h3>Gabungkan produk</h3><p class="hint">Pilih yang <b>benar</b> (dipertahankan). Contoh: Indomie Goreng + Indomie Goreng 85gr → pilih 85gr. Stok dijumlah, yang lain tidak dipakai lagi.</p>'+
+    rows+
+    '<button class="btn full" style="margin-top:12px" type="button" id="btnDoGabung">Gabungkan</button>');
+  var b=document.getElementById('btnDoGabung');
+  if(b) b.addEventListener('click', function(){
+    var keep=(document.querySelector('input[name="gabungKeep"]:checked')||{}).value;
+    gabungProduk(keep, ids);
+  });
+}
+async function gabungProduk(keepId, ids){
+  keepId=String(keepId||'');
+  ids=(ids||[]).map(String).filter(function(id){ return id && id!==keepId; });
+  var keep=find(STATE.data.produk, keepId);
+  if(!keep || !ids.length) return toast('Pilih produk yang benar');
+  if(!confirm('Gabungkan '+ids.length+' produk ke "'+keep.nama+'"? Stok dijumlah.')) return;
+  var stok=num(keep.stok);
+  ids.forEach(function(id){
+    var p=find(STATE.data.produk,id); if(!p) return;
+    stok=roundQ(stok+num(p.stok));
+    if(!String(keep.barcode||'').trim() && p.barcode) keep.barcode=p.barcode;
+    reassignProdukId(id, keepId, keep.nama);
+    p.aktif=0; p.stok=0;
+  });
+  keep.stok=stok;
+  try{ saveDB(); }catch(e){}
+  try{ await API('saveProduk', keep); }catch(e){}
+  for(var i=0;i<ids.length;i++){
+    var p=find(STATE.data.produk, ids[i]);
+    if(p){ try{ await API('saveProduk', p); }catch(e){} }
+    try{ await API('deleteProduk', {id:ids[i]}); }catch(e){}
+  }
+  STATE.data.produk=(STATE.data.produk||[]).filter(function(p){ return ids.indexOf(String(p.id))<0; });
+  closeModal();
+  try{ renderStok(); }catch(e){}
+  try{ renderProdukKasir(); }catch(e){}
+  toast('Digabung menjadi '+keep.nama);
 }
 function katKode(kat){
   if(!kat) return 'PRD';
@@ -6343,5 +6431,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38b57afad4edf93',t:'MTc4OTAxMDkwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
