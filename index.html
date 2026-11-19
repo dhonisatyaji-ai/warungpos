@@ -193,8 +193,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .pcard .price{margin:0;font-weight:800;color:var(--forest);font-size:13px;line-height:1.3;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 .pcard .stok{font-size:11px;background:#ecfdf5;color:#065f46;border-radius:999px;padding:3px 8px;white-space:nowrap;text-align:center;justify-self:end}
 .pcard .stok.low{background:#fff7ed;color:#9a3412}
-.stok-cek{width:18px!important;height:18px;padding:0!important;flex:none;accent-color:var(--forest)}
-.gabung-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:8px 0;cursor:pointer;background:#fff}
+.gabung-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin:6px 0;cursor:pointer;background:#fff}
+.gabung-row.on{border-color:var(--forest);background:#ecfdf5}
+.gabung-row.dim{opacity:.45}
 .gabung-row input{width:18px!important;height:18px;padding:0!important;margin-top:3px;flex:none;accent-color:var(--forest)}
 .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#fef3c7;color:#92400e;margin-right:4px}
 
@@ -261,6 +262,11 @@ td.col-aksi .btn{white-space:nowrap}
 .modal-bg{position:fixed;inset:0;background:rgba(28,25,23,.45);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:12px}
 .modal-bg.show{display:flex}
 .modal{background:var(--card);width:min(560px,100%);border-radius:20px 20px 12px 12px;padding:18px;max-height:90vh;overflow:auto}
+.modal.lebar{width:min(920px,100%)}
+.gabung-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+.gabung-col-h{font-weight:800;font-size:13px;margin:0 0 6px}
+.gabung-list{max-height:min(48vh,420px);overflow:auto;border:1px solid var(--line);border-radius:12px;padding:6px;background:#faf8f5;min-height:180px}
+@media(max-width:720px){.gabung-grid{grid-template-columns:1fr}}
 .modal h3{margin:0 0 10px}
 .choice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
 .choice.pay-grid{grid-template-columns:repeat(3,1fr)}
@@ -610,7 +616,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
       <div id="stokProdukBox">
         <div class="dash" id="stokDash"></div>
         <div class="table-wrap"><table><thead><tr>
-          <th></th><th>SKU</th><th>Barcode</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
+          <th>SKU</th><th>Barcode</th><th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Dingin</th><th>Stok</th><th></th>
         </tr></thead><tbody id="stokBody"></tbody></table></div>
       </div>
     </div>
@@ -1050,7 +1056,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.59';
+const APP_VERSION = '2026.09.06.60';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3641,18 +3647,10 @@ function renderStok(){
   }).map(p=>{
     const j=find(STATE.data.jenis,p.jenis_id)||{}; const k=find(STATE.data.kategori,p.kategori_id)||{};
     const low=num(p.stok)<=num(p.stok_min);
-    return '<tr><td><input type="checkbox" class="stok-cek" data-pid="'+esc(String(p.id))+'"></td><td>'+esc(p.sku)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
+    return '<tr><td>'+esc(p.sku)+'</td><td>'+esc(p.barcode||'-')+'</td><td>'+esc(p.nama)+'</td><td>'+esc(j.nama||'')+'</td><td>'+esc(k.nama||'')+'</td><td>'+rp(p.harga_jual)+'</td><td>'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</td><td class="'+(low?'danger-txt':'')+'">'+fmtQty(p.stok,p.satuan)+'</td><td>'+
       '<button class="btn-sm btn-ghost" onclick=\'openProduk('+JSON.stringify(p.id)+')\'>Ubah</button> '+
       '<button class="btn-sm btn-ghost" onclick=\'openAdjust('+JSON.stringify(p.id)+')\'>Stok</button></td></tr>';
-  }).join('')||'<tr><td colspan="10" class="muted">Tidak ada produk</td></tr>';
-}
-function stokCekIds(){
-  var ids=[];
-  document.querySelectorAll('#stokBody .stok-cek:checked').forEach(function(el){
-    var id=el.getAttribute('data-pid');
-    if(id) ids.push(id);
-  });
-  return ids;
+  }).join('')||'<tr><td colspan="9" class="muted">Tidak ada produk</td></tr>';
 }
 function reassignProdukId(fromId, toId, namaBaru){
   fromId=String(fromId); toId=String(toId);
@@ -3683,52 +3681,178 @@ function reassignProdukId(fromId, toId, namaBaru){
     localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
   }catch(e){}
 }
-function bukaGabungProduk(){
-  var ids=stokCekIds();
-  if(ids.length<2) return toast('Ceklis minimal 2 produk yang mau digabung');
-  var list=ids.map(function(id){ return find(STATE.data.produk,id); }).filter(Boolean);
-  if(list.length<2) return toast('Produk tidak ditemukan');
-  list.sort(function(a,b){ return String(b.nama||'').length-String(a.nama||'').length; });
-  var rows=list.map(function(p,i){
-    return '<label class="gabung-row"><input type="radio" name="gabungKeep" value="'+esc(String(p.id))+'"'+(i===0?' checked':'')+'>'+
-      '<span><b>'+esc(p.nama)+'</b><br><span class="muted">'+esc(p.sku||'-')+(p.barcode?(' · '+esc(p.barcode)):'')+' · stok '+fmtQty(p.stok,p.satuan)+'</span></span></label>';
-  }).join('');
-  modal('<h3>Gabungkan produk</h3><p class="hint">Pilih yang <b>benar</b> (dipertahankan). Contoh: Indomie Goreng + Indomie Goreng 85gr → pilih 85gr. Stok dijumlah, yang lain tidak dipakai lagi.</p>'+
-    rows+
-    '<button class="btn full" style="margin-top:12px" type="button" id="btnDoGabung">Gabungkan</button>');
-  var b=document.getElementById('btnDoGabung');
-  if(b) b.addEventListener('click', function(){
-    var keep=(document.querySelector('input[name="gabungKeep"]:checked')||{}).value;
-    gabungProduk(keep, ids);
+function gabungMergeKeranjang(fromId, toId){
+  fromId=String(fromId); toId=String(toId);
+  function merge(arr){
+    var out=[], idx={};
+    (arr||[]).forEach(function(it){
+      if(String(it.produk_id)===fromId) it.produk_id=toId;
+      var key=String(it.produk_id)+'|'+(it.is_dingin?1:0)+'|'+String(it.mode_berat||'');
+      if(idx[key]==null){ idx[key]=out.length; out.push(it); }
+      else out[idx[key]].qty=roundQ(num(out[idx[key]].qty)+num(it.qty));
+    });
+    return out;
+  }
+  STATE.cart=merge(STATE.cart);
+  STATE.beli=merge(STATE.beli);
+}
+async function reassignProdukRemote(fromId, toId){
+  if(typeof sbFetch!=='function' || !useSb()) return;
+  fromId=String(fromId); toId=String(toId);
+  var tables=['penjualan_item','pembelian_item','retur_penjualan_item','retur_pembelian_item','opname_item'];
+  for(var i=0;i<tables.length;i++){
+    try{
+      await sbFetch('/rest/v1/'+tables[i]+'?produk_id=eq.'+encodeURIComponent(fromId), {method:'PATCH', body:{produk_id:toId}});
+    }catch(e){}
+  }
+}
+function produkAktifList(){
+  return (STATE.data.produk||[]).filter(function(p){ return Number(p.aktif)!==0; }).slice().sort(function(a,b){
+    return String(a.nama||'').localeCompare(String(b.nama||''), 'id', {sensitivity:'base'});
   });
 }
+function cocokCariProduk(p, q){
+  q=String(q||'').toLowerCase().trim();
+  if(!q) return true;
+  return (p.nama+' '+p.sku+' '+(p.barcode||'')).toLowerCase().indexOf(q)!==-1;
+}
+function metaProdukGabung(p){
+  return esc(p.sku||'-')+(p.barcode?(' · '+esc(p.barcode)):'')+' · stok '+fmtQty(p.stok,p.satuan)+' · '+rp(p.harga_jual);
+}
+function bukaGabungProduk(){
+  STATE._gabungAsal=[];
+  STATE._gabungTujuan='';
+  var bg=document.getElementById('modalBg');
+  if(!bg) return;
+  bg.classList.add('show');
+  bg.innerHTML='<div class="modal lebar"><h3>Gabungkan produk</h3>'+
+    '<p class="hint">Kiri: produk asal (yang mau digabung). Kanan: produk tujuan yang <b>benar</b>. Contoh: kiri Indomie Goreng → kanan Indomie Goreng 85gr. Stok dijumlah.</p>'+
+    '<div class="gabung-grid">'+
+      '<div><div class="gabung-col-h">Produk asal</div>'+
+        '<input id="cariGabungAsal" placeholder="Cari produk asal…" oninput="renderGabungAsal()">'+
+        '<div id="listGabungAsal" class="gabung-list"></div></div>'+
+      '<div><div class="gabung-col-h">Produk tujuan (benar)</div>'+
+        '<input id="cariGabungTujuan" placeholder="Cari produk tujuan…" oninput="renderGabungTujuan()">'+
+        '<div id="listGabungTujuan" class="gabung-list"></div></div>'+
+    '</div>'+
+    '<div id="gabungRingkas" class="hint" style="margin-top:10px"></div>'+
+    '<button class="btn full" style="margin-top:12px" type="button" id="btnDoGabung">Gabungkan ke tujuan</button>'+
+    '<div style="text-align:right;margin-top:8px"><button class="btn-ghost btn-sm" type="button" onclick="closeModal()">Tutup</button></div></div>';
+  renderGabungAsal();
+  renderGabungTujuan();
+  var b=document.getElementById('btnDoGabung');
+  if(b) b.addEventListener('click', jalankanGabungProduk);
+  setTimeout(function(){ var i=document.getElementById('cariGabungAsal'); if(i) i.focus(); }, 40);
+}
+function renderGabungAsal(){
+  var box=document.getElementById('listGabungAsal'); if(!box) return;
+  var q=(document.getElementById('cariGabungAsal')||{}).value||'';
+  var tujuan=String(STATE._gabungTujuan||'');
+  var seen=STATE._gabungAsal||[];
+  var rows=produkAktifList().filter(function(p){ return cocokCariProduk(p,q); }).map(function(p){
+    var id=String(p.id);
+    var on=seen.indexOf(id)>=0;
+    var dis=!!tujuan && id===tujuan;
+    return '<label class="gabung-row'+(on?' on':'')+(dis?' dim':'')+'">'+
+      '<input type="checkbox" value="'+esc(id)+'"'+(on?' checked':'')+(dis?' disabled':'')+' onchange="toggleGabungAsal(this)">'+
+      '<span><b>'+esc(p.nama)+'</b><br><span class="muted">'+metaProdukGabung(p)+'</span></span></label>';
+  }).join('')||'<div class="muted" style="padding:10px">Tidak ada</div>';
+  box.innerHTML=rows;
+  updateGabungRingkas();
+}
+function renderGabungTujuan(){
+  var box=document.getElementById('listGabungTujuan'); if(!box) return;
+  var q=(document.getElementById('cariGabungTujuan')||{}).value||'';
+  var keep=String(STATE._gabungTujuan||'');
+  var rows=produkAktifList().filter(function(p){ return cocokCariProduk(p,q); }).map(function(p){
+    var id=String(p.id);
+    var on=keep===id;
+    return '<label class="gabung-row'+(on?' on':'')+'">'+
+      '<input type="radio" name="gabungTujuan" value="'+esc(id)+'"'+(on?' checked':'')+' onchange="pilihGabungTujuan(this)">'+
+      '<span><b>'+esc(p.nama)+'</b><br><span class="muted">'+metaProdukGabung(p)+'</span></span></label>';
+  }).join('')||'<div class="muted" style="padding:10px">Tidak ada</div>';
+  box.innerHTML=rows;
+  updateGabungRingkas();
+}
+function toggleGabungAsal(el){
+  var id=String(el.value||'');
+  STATE._gabungAsal=STATE._gabungAsal||[];
+  var i=STATE._gabungAsal.indexOf(id);
+  if(el.checked){
+    if(i<0) STATE._gabungAsal.push(id);
+    if(String(STATE._gabungTujuan)===id){ STATE._gabungTujuan=''; renderGabungTujuan(); }
+  } else if(i>=0) STATE._gabungAsal.splice(i,1);
+  var row=el.closest('.gabung-row');
+  if(row) row.classList.toggle('on', !!el.checked);
+  updateGabungRingkas();
+}
+function pilihGabungTujuan(el){
+  STATE._gabungTujuan=String(el.value||'');
+  STATE._gabungAsal=(STATE._gabungAsal||[]).filter(function(id){ return id!==STATE._gabungTujuan; });
+  renderGabungAsal();
+  renderGabungTujuan();
+}
+function updateGabungRingkas(){
+  var el=document.getElementById('gabungRingkas'); if(!el) return;
+  var asal=(STATE._gabungAsal||[]).map(function(id){ return find(STATE.data.produk,id); }).filter(Boolean);
+  var keep=find(STATE.data.produk, STATE._gabungTujuan);
+  if(!asal.length && !keep){ el.textContent='Cari dan pilih di kiri (asal) serta kanan (tujuan).'; return; }
+  var names=asal.map(function(p){ return p.nama; }).join(', ')||'—';
+  el.innerHTML='Asal: <b>'+esc(names)+'</b> → Tujuan: <b>'+esc(keep?keep.nama:'(pilih di kanan)')+'</b>';
+}
+function jalankanGabungProduk(){
+  var keep=String(STATE._gabungTujuan||'');
+  var ids=(STATE._gabungAsal||[]).slice();
+  if(!keep) return toast('Pilih produk tujuan di kanan');
+  if(!ids.length) return toast('Pilih produk asal di kiri');
+  gabungProduk(keep, ids);
+}
 async function gabungProduk(keepId, ids){
+  if(window._gabungLock) return;
   keepId=String(keepId||'');
   ids=(ids||[]).map(String).filter(function(id){ return id && id!==keepId; });
   var keep=find(STATE.data.produk, keepId);
-  if(!keep || !ids.length) return toast('Pilih produk yang benar');
-  if(!confirm('Gabungkan '+ids.length+' produk ke "'+keep.nama+'"? Stok dijumlah.')) return;
-  var stok=num(keep.stok);
-  ids.forEach(function(id){
-    var p=find(STATE.data.produk,id); if(!p) return;
-    stok=roundQ(stok+num(p.stok));
-    if(!String(keep.barcode||'').trim() && p.barcode) keep.barcode=p.barcode;
-    reassignProdukId(id, keepId, keep.nama);
-    p.aktif=0; p.stok=0;
-  });
-  keep.stok=stok;
-  try{ saveDB(); }catch(e){}
-  try{ await API('saveProduk', keep); }catch(e){}
-  for(var i=0;i<ids.length;i++){
-    var p=find(STATE.data.produk, ids[i]);
-    if(p){ try{ await API('saveProduk', p); }catch(e){} }
-    try{ await API('deleteProduk', {id:ids[i]}); }catch(e){}
-  }
-  STATE.data.produk=(STATE.data.produk||[]).filter(function(p){ return ids.indexOf(String(p.id))<0; });
-  closeModal();
-  try{ renderStok(); }catch(e){}
-  try{ renderProdukKasir(); }catch(e){}
-  toast('Digabung menjadi '+keep.nama);
+  if(!keep || !ids.length) return toast('Pilih asal dan tujuan yang berbeda');
+  if(!confirm('Gabungkan '+ids.length+' produk ke "'+keep.nama+'"? Stok dijumlah, produk asal tidak dipakai lagi.')) return;
+  window._gabungLock=true;
+  try{
+    var stok=num(keep.stok);
+    ids.forEach(function(id){
+      var p=find(STATE.data.produk,id); if(!p) return;
+      stok=roundQ(stok+num(p.stok));
+      if(!String(keep.barcode||'').trim() && String(p.barcode||'').trim()){
+        keep.barcode=p.barcode;
+        p.barcode='';
+      }
+      reassignProdukId(id, keepId, keep.nama);
+      gabungMergeKeranjang(id, keepId);
+      p.aktif=0; p.stok=0;
+    });
+    keep.stok=stok;
+    try{ saveDB(); }catch(e){}
+    for(var i=0;i<ids.length;i++){
+      var src=find(STATE.data.produk, ids[i]);
+      if(src){ try{ await API('saveProduk', src); }catch(e){} }
+      try{ await reassignProdukRemote(ids[i], keepId); }catch(e){}
+    }
+    try{ await API('saveProduk', keep); }
+    catch(e){ toast('Gagal simpan tujuan: '+(e.message||e)); return; }
+    var gagal=[];
+    for(var j=0;j<ids.length;j++){
+      try{ await API('deleteProduk', {id:ids[j]}); }
+      catch(e){ gagal.push(ids[j]); }
+    }
+    STATE.data.produk=(STATE.data.produk||[]).filter(function(p){
+      return gagal.indexOf(String(p.id))>=0 || ids.indexOf(String(p.id))<0;
+    });
+    if(useRemote()){
+      try{ STATE.data.produk=await API('getProduk'); }catch(e){}
+    }
+    closeModal();
+    try{ renderStok(); }catch(e){}
+    try{ renderProdukKasir(); }catch(e){}
+    toast('Digabung menjadi '+keep.nama);
+  }finally{ window._gabungLock=false; }
 }
 function katKode(kat){
   if(!kat) return 'PRD';
@@ -6498,5 +6622,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a51abd63cd4efd07',t:'MTc5MzE5ODg4OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
