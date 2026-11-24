@@ -131,7 +131,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .draft-bar{display:flex;gap:6px;margin:0 0 10px}
 .draft-bar .btn-sm{flex:1}
 .cart-acts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 10px}
-.cart-acts button{border:0;border-radius:10px;padding:10px 8px;min-height:42px;font-weight:800;font-size:12px;line-height:1.2;color:#fff}
+.cart-acts button{border:0;border-radius:9px;padding:8px 6px;min-height:34px;font-weight:800;font-size:11px;line-height:1.2;color:#fff}
 .cart-acts .act-save{background:var(--forest)}
 .cart-acts .act-draft{background:var(--sky)}
 .cart-acts .act-reprint{background:#0f766e}
@@ -171,7 +171,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 #view-kasir.active{display:flex;flex-direction:column;overflow:hidden;padding-bottom:12px}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-.kasir{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:stretch;flex:1;min-height:0;height:100%}
+.kasir{display:grid;grid-template-columns:minmax(0,1fr) minmax(440px,1.15fr);gap:12px;align-items:stretch;flex:1;min-height:0;height:100%}
 .kasir-left{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .kasir-left .searchbar,.kasir-left .cats{flex:none}
 .kasir-left .grid{flex:1;min-height:0;overflow:auto;align-content:start;-webkit-overflow-scrolling:touch}
@@ -199,26 +199,34 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .gabung-row input{width:18px!important;height:18px;padding:0!important;margin-top:3px;flex:none;accent-color:var(--forest)}
 .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#fef3c7;color:#92400e;margin-right:4px}
 
-.cart{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;position:relative;
-  display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden}
-.cart h3{margin:0 0 8px;font-size:16px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.cart-n{font-size:12px;font-weight:700;color:var(--muted)}
+.cart{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;position:relative;
+  display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden;font-size:12px}
+.cart h3{margin:0 0 6px;font-size:14px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cart-n{font-size:11px;font-weight:700;color:var(--muted)}
 .cart-head{flex:none}
 .cart-foot{flex:none;background:var(--card);padding-top:4px}
 .cart .fld{margin:8px 0 4px}
 .pel-row{display:flex;gap:8px;align-items:stretch}
 .pel-row select{flex:1;min-width:0}
 .pel-row button{flex:none;width:46px;padding:0;font-size:22px;line-height:1;font-weight:800}
-.cart-items{flex:1;min-height:0;max-height:none;overflow:auto;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
-.citem{border:1px solid var(--line);border-radius:12px;padding:8px}
-.citem .nm{font-weight:700;font-size:13px}
-.citem .sub{font-size:11px;color:var(--muted)}
-.qtyrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
-.qtyctl{display:flex;align-items:center;gap:6px}
-.qtyctl button{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:#fff;font-weight:800}
-.totals{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px;font-size:13px}
+.cart-items{flex:1;min-height:0;max-height:none;overflow:auto;display:flex;flex-direction:column;gap:6px;-webkit-overflow-scrolling:touch}
+.citem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.citem-info{min-width:0}
+.citem .nm{font-weight:700;font-size:12px;line-height:1.3;word-break:break-word;white-space:normal}
+.citem .sub{font-size:10px;color:var(--muted);line-height:1.3}
+.qtyrow{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:0}
+.qtyrow b{font-size:12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.qtyctl{display:flex;align-items:center;gap:4px}
+.qtyctl b{min-width:1.2em;text-align:center;font-size:12px}
+.qtyctl button{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);background:#fff;font-weight:800;font-size:13px;line-height:1}
+.qty-pop{display:flex;align-items:center;justify-content:center;gap:8px;margin:4px 0}
+.qty-pop input{text-align:center;font-size:22px;font-weight:800;flex:1;max-width:160px;padding:10px}
+.qty-pop > button{width:48px;height:48px;flex:none;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:22px;font-weight:800}
+.qty-quick{display:flex;gap:6px;margin-top:8px}
+.qty-quick button{flex:1;padding:8px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:800}
+.totals{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:12px}
 .totals div{display:flex;justify-content:space-between;margin:4px 0}
-.totals .grand{font-size:18px;font-weight:800;color:var(--forest)}
+.totals .grand{font-size:16px;font-weight:800;color:var(--forest)}
 .totals .diskon-box{display:block;margin:8px 0 6px;padding:8px;border:1px dashed var(--line);border-radius:12px;background:#fffdf8}
 .totals .diskon-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin:0 0 6px}
 .totals .diskon-isi{display:flex;justify-content:flex-start;gap:6px;align-items:center;margin:0}
@@ -1056,7 +1064,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.60';
+const APP_VERSION = '2026.09.06.61';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2858,17 +2866,78 @@ function scanAdd(){
   const q=(document.getElementById('cariProduk').value||'').trim();
   if(!q) return;
   const p=STATE.data.produk.find(x=>String(x.barcode)===q || String(x.sku).toLowerCase()===q.toLowerCase() || x.nama.toLowerCase()===q.toLowerCase());
-  if(p){ pilihProduk(p.id); document.getElementById('cariProduk').value=''; renderProdukKasir(); }
+  if(p){
+    const kode=jenisKode(p);
+    if(kode==='berat' || kode==='minuman') pilihProduk(p.id);
+    else {
+      if(num(p.stok)<=0){ toast('Stok habis'); return; }
+      addCart({produk_id:p.id,qty:1,is_dingin:0,mode_berat:'',nominal:0,satuan_input:p.satuan});
+    }
+    document.getElementById('cariProduk').value=''; renderProdukKasir();
+  }
   else toast('Produk tidak ditemukan');
 }
 function pilihProduk(id){
   const p=find(STATE.data.produk,id); if(!p) return;
   if(num(p.stok)<=0){ toast('Stok habis'); return; }
   const kode=jenisKode(p);
-  if(kode==='minuman') openMinuman(p);
-  else if(kode==='berat') openBerat(p);
-  else if(promoBertingkatOf(p.id)) openPromoQty(p);
-  else addCart({produk_id:p.id,qty:1,is_dingin:0,mode_berat:'',nominal:0,satuan_input:p.satuan});
+  if(kode==='berat') openBerat(p);
+  else openQtyKasir(p);
+}
+function openQtyKasir(p){
+  const minuman=jenisKode(p)==='minuman';
+  let html='<h3>'+esc(p.nama)+'</h3><p class="hint">Stok '+fmtQty(p.stok,p.satuan)+(minuman?'':' · '+rp(p.harga_jual)+' / '+(p.satuan||'pcs'))+'</p>';
+  if(minuman){
+    html+='<div class="choice" id="qtyJenisMinum">'+
+      '<button type="button" class="sel" data-dingin="0"><div>Biasa</div><div class="muted">'+rp(p.harga_jual)+'</div></button>'+
+      '<button type="button" data-dingin="1"><div>Dingin</div><div class="muted">'+(num(p.harga_dingin)?rp(p.harga_dingin):'-')+'</div></button></div>';
+  }
+  const pr=promoBertingkatOf(p.id);
+  if(pr && (pr.tingkat||[]).length){
+    const tk=(pr.tingkat||[]).slice().sort(function(a,b){ return num(a.qty)-num(b.qty); });
+    html+='<p class="hint">Promo: '+tk.map(function(x){ return esc(x.label||('Beli '+x.qty))+' '+rp(x.harga); }).join(' · ')+'</p>';
+  }
+  html+='<label class="fld">Jumlah</label><div class="qty-pop">'+
+    '<button type="button" id="qtyPopMin">−</button>'+
+    '<input id="inQtyKasir" type="number" min="1" step="1" value="1" inputmode="numeric">'+
+    '<button type="button" id="qtyPopPlus">+</button></div>'+
+    '<div class="qty-quick">'+[1,2,3,5,10].map(function(n){ return '<button type="button" class="qty-q" data-q="'+n+'">'+n+'</button>'; }).join('')+'</div>'+
+    '<button class="btn full" type="button" id="btnQtyMasuk" style="margin-top:12px">Masukkan keranjang</button>';
+  modal(html);
+  window._qtyDingin=0;
+  function bacaQty(){ return Math.max(1, Math.round(num((document.getElementById('inQtyKasir')||{}).value)||1)); }
+  function tulisQty(n){ var el=document.getElementById('inQtyKasir'); if(el) el.value=String(Math.max(1, n)); }
+  var box=document.getElementById('qtyJenisMinum');
+  if(box){
+    box.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        window._qtyDingin=b.getAttribute('data-dingin')==='1'?1:0;
+        box.querySelectorAll('button').forEach(function(x){ x.classList.toggle('sel', x===b); });
+      });
+    });
+  }
+  var inp=document.getElementById('inQtyKasir');
+  var min=document.getElementById('qtyPopMin');
+  var plus=document.getElementById('qtyPopPlus');
+  if(min) min.addEventListener('click', function(){ tulisQty(bacaQty()-1); });
+  if(plus) plus.addEventListener('click', function(){ tulisQty(bacaQty()+1); });
+  document.querySelectorAll('#modalBg .qty-q').forEach(function(b){
+    b.addEventListener('click', function(){ tulisQty(num(b.getAttribute('data-q'))); });
+  });
+  function commit(){
+    var qty=bacaQty();
+    if(qty<=0) return toast('Jumlah tidak valid');
+    if(qty>num(p.stok)+1e-9) return toast('Stok '+p.nama+' tidak cukup');
+    if(minuman && window._qtyDingin && !num(p.harga_dingin)) return toast('Harga dingin belum diisi');
+    addCart({produk_id:p.id,qty:qty,is_dingin:minuman&&window._qtyDingin?1:0,mode_berat:'',nominal:0,satuan_input:p.satuan});
+    closeModal();
+  }
+  var go=document.getElementById('btnQtyMasuk');
+  if(go) go.addEventListener('click', commit);
+  if(inp){
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); commit(); } });
+    setTimeout(function(){ inp.focus(); if(inp.select) inp.select(); }, 40);
+  }
 }
 function openPromoQty(p){
   const pr=promoBertingkatOf(p.id); if(!pr) return;
@@ -3023,14 +3092,15 @@ function renderCart(){
     else if(c.kode==='berat') det=fmtQty(c.qty,c.p.satuan);
     const qtyCtl = c.kode==='berat' ? '<span class="muted">'+fmtQty(c.qty,c.p.satuan)+'</span>' :
       '<div class="qtyctl"><button onclick="chgQty('+i+',-1)">−</button><b>'+it.qty+'</b><button onclick="chgQty('+i+',1)">+</button></div>';
-    return '<div class="citem"><div class="nm">'+esc(c.p.nama)+'</div><div class="sub">'+det+' · '+rp(c.harga)+(c.kode==='berat'?'/'+c.p.satuan:'')+'</div>'+
+    var subdet=(c.p.sku?esc(c.p.sku)+' · ':'')+(det?det+' · ':'')+rp(c.harga)+(c.kode==='berat'?'/'+c.p.satuan:'');
+    return '<div class="citem"><div class="citem-info"><div class="nm">'+esc(c.p.nama)+'</div><div class="sub">'+subdet+'</div></div>'+
       '<div class="qtyrow">'+qtyCtl+'<b>'+rp(c.sub)+'</b><button class="btn-ghost btn-sm" onclick="delCart('+i+')">✕</button></div></div>';
   }).join('');
   const tot=cartTotals();
   sub=tot.sub;
   if(tot.promo && tot.promo.rows.length){
     box.innerHTML += tot.promo.rows.map(function(r){
-      return '<div class="citem promo-line"><div class="nm">Promo '+esc(r.nama)+'</div><div class="sub">'+r.n+' paket</div><div class="qtyrow"><span></span><b class="num-in">− '+rp(r.hemat)+'</b></div></div>';
+      return '<div class="citem promo-line"><div class="citem-info"><div class="nm">Promo '+esc(r.nama)+'</div><div class="sub">'+r.n+' paket</div></div><div class="qtyrow"><b class="num-in">− '+rp(r.hemat)+'</b></div></div>';
     }).join('');
   }
   const promoRowEl=document.getElementById('tPromoRow');
