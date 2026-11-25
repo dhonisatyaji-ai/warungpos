@@ -205,6 +205,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cart-n{font-size:11px;font-weight:700;color:var(--muted)}
 .cart-head{flex:none}
 .cart-foot{flex:none;background:var(--card);padding-top:4px}
+.cart-pay{margin:4px 0 6px}
+.cart .choice.pay-grid button{padding:8px 4px;font-size:11px}
+.cart .kembali-box{margin-top:8px;padding:8px 10px;border-radius:10px}
+.cart .kembali-box span{font-size:11px}
+.cart .kembali-box b{font-size:14px}
+.cart-admin{margin:8px 0 6px;padding:8px;border:1px dashed var(--line);border-radius:12px;background:#fffdf8}
+.cart-admin .fld{margin:4px 0}
 .cart .fld{margin:8px 0 4px}
 .pel-row{display:flex;gap:8px;align-items:stretch}
 .pel-row select{flex:1;min-width:0}
@@ -605,6 +612,46 @@ html.has-session .boot-splash:not(.hide){display:grid}
             </div>
             <div class="grand"><span>Total</span><span id="tGrand">Rp 0</span></div>
           </div>
+          <div id="boxAdminKasir" class="app-hidden cart-admin">
+            <div class="two">
+              <div><label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()"></select>
+                <input id="payKasirNama" placeholder="Nama di struk" style="margin-top:6px"></div>
+              <div><label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local"></div>
+            </div>
+          </div>
+          <label class="fld">Pembayaran</label>
+          <div class="choice pay-grid cart-pay">
+            <button type="button" data-pay="tunai" class="sel" onclick="selPay('tunai')">Tunai</button>
+            <button type="button" data-pay="qris" onclick="selPay('qris')">QRIS</button>
+            <button type="button" data-pay="transfer" onclick="selPay('transfer')">Transfer</button>
+            <button type="button" data-pay="debit" onclick="selPay('debit')">Debit</button>
+            <button type="button" data-pay="hutang" onclick="selPay('hutang')">Hutang</button>
+            <button type="button" data-pay="campuran" onclick="selPay('campuran')">Kombinasi</button>
+          </div>
+          <div id="boxTunai">
+            <label class="fld">Uang diterima</label>
+            <input id="inBayar" type="number" min="0" inputmode="numeric" value="0" oninput="hitungKembalian()" onkeyup="hitungKembalian()" onclick="this.select()">
+            <div class="row-btns" id="payPasBtns" style="margin-top:6px"></div>
+          </div>
+          <div id="boxNonTunai" class="app-hidden"><p class="hint">Non-tunai: nominal pas, tidak masuk laci kas.</p>
+            <div id="qrisBox" class="app-hidden" style="text-align:center"><img id="qrisImg" alt="QRIS" style="max-width:140px;width:100%;border-radius:10px;margin:6px auto;display:block;background:#fff">
+            <p class="hint" id="qrisHint">Scan QRIS, bayar nominal pas.</p></div></div>
+          <div id="boxHutang" class="app-hidden"><p class="hint">Masuk piutang pelanggan. Umum tidak boleh hutang.</p></div>
+          <div id="boxCampur" class="app-hidden">
+            <label class="fld">Jumlah tunai</label>
+            <input id="inCampur" type="number" min="0" inputmode="numeric" value="0" oninput="hitungKembalian()" onkeyup="hitungKembalian()" onclick="this.select()">
+            <label class="fld">Sisa dibayar dengan</label>
+            <div class="choice pay-grid cart-pay" id="pay2Grid">
+              <button type="button" data-pay2="qris" class="sel" onclick="selPay2('qris')">QRIS</button>
+              <button type="button" data-pay2="transfer" onclick="selPay2('transfer')">Transfer</button>
+              <button type="button" data-pay2="debit" onclick="selPay2('debit')">Debit</button>
+              <button type="button" data-pay2="hutang" onclick="selPay2('hutang')">Hutang</button>
+            </div>
+            <div id="qrisBox2" class="app-hidden" style="text-align:center"><img id="qrisImg2" alt="QRIS" style="max-width:140px;width:100%;border-radius:10px;margin:6px auto;display:block;background:#fff">
+            <p class="hint" id="qrisHint2">Scan QRIS untuk sisa.</p></div>
+            <p class="hint" id="campurHint">Isi tunai, sisa ke metode kedua.</p>
+          </div>
+          <div class="kembali-box" id="kembalianBox"><span id="kembalianLabel">Kembalian</span><b id="kembalianNilai">Rp 0</b></div>
           <label class="fld">Catatan</label>
           <input id="catatanKasir" placeholder="Opsional">
           <div class="row-btns" style="margin-top:10px">
@@ -1066,7 +1113,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.65';
+const APP_VERSION = '2026.09.06.66';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -2429,7 +2476,7 @@ function showView(name){
   STATE.view=name;
   if(STATE.user) saveSession();
   if(name==='dash') renderDashboard();
-  if(name==='kasir'){ renderProdukKasir(); renderPelangganSelect(true); renderCart(); renderDraftBar(); refreshDash(); }
+  if(name==='kasir'){ renderProdukKasir(); renderPelangganSelect(true); renderCart(); renderDraftBar(); refreshDash(); isiPanelBayarKasir(); }
   if(name==='stok') renderStok();
   if(name==='opname') renderOpname();
   if(name==='beli') renderBeliForm();
@@ -3240,6 +3287,7 @@ function renderCart(){
   syncCartCount();
   try{ syncDiskonLock(); }catch(e){}
   if(STATE.user) saveSession();
+  try{ syncPayPas(); }catch(e){}
 }
 function syncDiskonKet(tot){
   tot=tot||{};
@@ -3436,6 +3484,10 @@ function clearCart(){
   STATE.cart=[]; STATE.diskonAuthOk=false; STATE._diskonPending=null;
   document.getElementById('diskonKasir').value=0; document.getElementById('catatanKasir').value='';
   const dm=document.getElementById('diskonMode'); if(dm) dm.value='rp';
+  window._pay='tunai'; window._pay2='qris';
+  var ic=document.getElementById('inCampur'); if(ic) ic.value=0;
+  var pt=document.getElementById('payTgl'); if(pt) pt.value=isoToLocalInput(nowIso());
+  try{ selPay('tunai'); }catch(e){}
   renderCart();
   renderPelangganSelect(false);
   renderDraftBar();
@@ -3540,6 +3592,46 @@ function hitungKembalian(){
   lab.textContent=k<0?'Uang kurang':'Kembalian';
   val.textContent=rp(Math.abs(k));
 }
+function isiPanelBayarKasir(){
+  if(!window._pay) window._pay='tunai';
+  if(!window._pay2) window._pay2='qris';
+  var adm=document.getElementById('boxAdminKasir');
+  if(adm) adm.classList.toggle('app-hidden', !isAdmin());
+  var sel=document.getElementById('payKasir');
+  if(sel && isAdmin()){
+    var cur=sel.value||(STATE.user&&STATE.user.id);
+    sel.innerHTML=htmlOptKasir(cur);
+  }
+  var nm=document.getElementById('payKasirNama');
+  if(nm && isAdmin() && !String(nm.value||'').trim()){
+    nm.value=(STATE.user&&(STATE.user.nama||STATE.user.username))||'';
+  }
+  var pt=document.getElementById('payTgl');
+  if(pt && isAdmin() && !pt.value) pt.value=isoToLocalInput(nowIso());
+  try{ selPay(window._pay); }catch(e){}
+  syncPayPas();
+}
+function syncPayPas(){
+  var tot=0;
+  try{ tot=cartTotals().total; }catch(e){ tot=0; }
+  window._payTotal=tot;
+  var box=document.getElementById('payPasBtns');
+  if(box){
+    var pas=tot;
+    var rb1=Math.ceil(tot/1000)*1000;
+    var rb2=Math.ceil(tot/50000)*50000;
+    box.innerHTML='<button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+pas+')">Pas</button>'+
+      '<button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+rb1+')">'+rp(rb1)+'</button>'+
+      (rb2!==rb1?'<button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+rb2+')">'+rp(rb2)+'</button>':'');
+  }
+  var inb=document.getElementById('inBayar');
+  if(inb){
+    var prev=inb.getAttribute('data-pas');
+    if(!String(inb.value||'') || String(inb.value)===String(prev||'')) inb.value=tot;
+    inb.setAttribute('data-pas', String(tot));
+  }
+  try{ hitungKembalian(); }catch(e){}
+}
 function openBayar(){
   if(!STATE.cart.length) return toast('Keranjang kosong');
   try{
@@ -3549,50 +3641,7 @@ function openBayar(){
       return;
     }
   }catch(e){}
-  const t=cartTotals();
-  window._payTotal=t.total;
-  const pas=t.total;
-  const rb1=Math.ceil(t.total/1000)*1000;
-  const rb2=Math.ceil(t.total/50000)*50000;
-  var adminBox='';
-  if(isAdmin()){
-    adminBox='<div class="two" id="boxAdminKasir" style="margin:8px 0 10px">'+
-      '<div><label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()">'+htmlOptKasir()+'</select>'+
-      '<input id="payKasirNama" value="'+esc((STATE.user&&(STATE.user.nama||STATE.user.username))||'')+'" placeholder="Nama di struk" style="margin-top:6px"></div>'+
-      '<div><label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local" value="'+esc(isoToLocalInput(nowIso()))+'"></div></div>';
-  }
-  modal('<h3>Pembayaran</h3><p>'+esc(cartQtyText())+' · Total <b>'+rp(t.total)+'</b></p>'+adminBox+
-    '<div class="choice pay-grid">'+
-    '<button type="button" data-pay="tunai" class="sel" onclick="selPay(\'tunai\')">Tunai</button>'+
-    '<button type="button" data-pay="qris" onclick="selPay(\'qris\')">QRIS</button>'+
-    '<button type="button" data-pay="transfer" onclick="selPay(\'transfer\')">Transfer</button>'+
-    '<button type="button" data-pay="debit" onclick="selPay(\'debit\')">Debit</button>'+
-    '<button type="button" data-pay="hutang" onclick="selPay(\'hutang\')">Hutang</button>'+
-    '<button type="button" data-pay="campuran" onclick="selPay(\'campuran\')">Kombinasi</button></div>'+
-    '<div id="boxTunai"><label class="fld">Uang diterima</label><input id="inBayar" type="number" min="0" inputmode="numeric" value="'+pas+'" oninput="hitungKembalian()" onkeyup="hitungKembalian()" onclick="this.select()">'+
-    '<div class="row-btns" style="margin-top:8px"><button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+pas+')">Pas</button>'+
-    '<button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+rb1+')">'+rp(rb1)+'</button>'+
-    (rb2!==rb1?'<button class="btn-sm btn-ghost" type="button" onclick="isiBayar('+rb2+')">'+rp(rb2)+'</button>':'')+
-    '</div></div>'+
-    '<div id="boxNonTunai" class="app-hidden"><p class="hint">Pembayaran non-tunai. Nominal pas, tanpa kembalian, tidak masuk laci kas — tercatat di omzet.</p>'+
-    '<div id="qrisBox" class="app-hidden" style="text-align:center"><img id="qrisImg" alt="QRIS" style="max-width:220px;width:100%;border-radius:12px;margin:8px auto;display:block;background:#fff">'+
-    '<p class="hint" id="qrisHint">Scan QRIS, bayar nominal pas.</p></div></div>'+
-    '<div id="boxHutang" class="app-hidden"><p class="hint">Total akan masuk ke piutang pelanggan yang dipilih. Pelanggan Umum tidak boleh hutang.</p></div>'+
-    '<div id="boxCampur" class="app-hidden"><label class="fld">Jumlah tunai</label><input id="inCampur" type="number" min="0" inputmode="numeric" value="0" oninput="hitungKembalian()" onkeyup="hitungKembalian()" onclick="this.select()">'+
-    '<label class="fld">Sisa dibayar dengan</label>'+
-    '<div class="choice pay-grid" id="pay2Grid">'+
-    '<button type="button" data-pay2="qris" class="sel" onclick="selPay2(\'qris\')">QRIS</button>'+
-    '<button type="button" data-pay2="transfer" onclick="selPay2(\'transfer\')">Transfer</button>'+
-    '<button type="button" data-pay2="debit" onclick="selPay2(\'debit\')">Debit</button>'+
-    '<button type="button" data-pay2="hutang" onclick="selPay2(\'hutang\')">Hutang</button></div>'+
-    '<div id="qrisBox2" class="app-hidden" style="text-align:center"><img id="qrisImg2" alt="QRIS" style="max-width:180px;width:100%;border-radius:12px;margin:8px auto;display:block;background:#fff">'+
-    '<p class="hint" id="qrisHint2">Scan QRIS untuk sisa.</p></div>'+
-    '<p class="hint" id="campurHint">Isi tunai, sisa otomatis ke metode kedua.</p></div>'+
-    '<div class="kembali-box" id="kembalianBox"><span id="kembalianLabel">Kembalian</span><b id="kembalianNilai">Rp 0</b></div>'+
-    '<button class="btn btn-gold full" style="margin-top:12px" onclick="prosesBayar()">Selesaikan · '+esc(cartQtyText())+'</button>');
-  window._pay='tunai';
-  window._pay2='qris';
-  setTimeout(function(){ hitungKembalian(); var el=document.getElementById('inBayar'); if(el) el.focus(); },0);
+  prosesBayar();
 }
 function selPay(m){
   window._pay=m;
@@ -3899,20 +3948,27 @@ function openEditNota(){
   if(!isAdmin()) return toast('Hanya admin');
   var res=window._strukLast; if(!res) return toast('Tidak ada struk');
   modal('<h3>Ubah nota</h3><p class="hint">'+esc(res.nomor||'')+'</p>'+
-    '<label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()">'+htmlOptKasir(res.user_id)+'</select>'+
-    '<input id="payKasirNama" value="'+esc(namaKasirDari(res))+'" placeholder="Nama di struk" style="margin-top:6px">'+
-    '<label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local" value="'+esc(isoToLocalInput(res.tanggal||nowIso()))+'">'+
+    '<label class="fld">Nama kasir</label><select id="editNotaKasir">'+htmlOptKasir(res.user_id)+'</select>'+
+    '<input id="editNotaNama" value="'+esc(namaKasirDari(res))+'" placeholder="Nama di struk" style="margin-top:6px">'+
+    '<label class="fld">Tanggal transaksi</label><input id="editNotaTgl" type="datetime-local" value="'+esc(isoToLocalInput(res.tanggal||nowIso()))+'">'+
     '<button class="btn full" type="button" id="btnSimpanEditNota" style="margin-top:12px">Simpan</button>');
+  var es=document.getElementById('editNotaKasir');
+  if(es) es.addEventListener('change', function(){
+    var u=find(STATE.data.user, es.value)||{};
+    var i=document.getElementById('editNotaNama'); if(i) i.value=u.nama||u.username||'';
+  });
   var b=document.getElementById('btnSimpanEditNota');
   if(b) b.addEventListener('click', simpanEditNota);
 }
 async function simpanEditNota(){
   if(!isAdmin()) return toast('Hanya admin');
   var res=window._strukLast; if(!res) return toast('Tidak ada struk');
-  var adm=bacaBayarAdmin();
-  res.user_id=adm.user_id;
-  res.kasir_nama=adm.kasir_nama;
-  res.tanggal=adm.tanggal;
+  var uid= (document.getElementById('editNotaKasir')||{}).value || (STATE.user&&STATE.user.id);
+  var knm=String((document.getElementById('editNotaNama')||{}).value||'').trim();
+  var tgl=(document.getElementById('editNotaTgl')||{}).value;
+  res.user_id=uid;
+  res.kasir_nama=knm||namaKasirDari({user_id:uid});
+  res.tanggal=tgl?localInputToIso(tgl):(res.tanggal||nowIso());
   var row=find(STATE.data.penjualan, res.id);
   if(!row && res.nomor) row=(STATE.data.penjualan||[]).find(function(p){ return String(p.nomor)===String(res.nomor); });
   if(row){
@@ -7044,5 +7100,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd3486284b26da',t:'MTc5NTU3MzU1MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd3486284b26da',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd43cc3db2600d',t:'MTc5NTU3NDE3Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd43cc3db2600d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
