@@ -1066,7 +1066,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.64';
+const APP_VERSION = '2026.09.06.65';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1984,7 +1984,10 @@ function localPenjualan(p){
   const tanggal=p.tanggal?localInputToIso(p.tanggal):nowIso();
   const userId=p.user_id||(STATE.user&&STATE.user.id);
   const kasirNama=String(p.kasir_nama||(find(d.user,userId)||STATE.user||{}).nama||'').trim();
-  const id=uid('PJ'), nomor='PJ-'+String(tanggal).slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10);
+  const id=uid('PJ');
+  let nomor=String(p.nomor||'').trim();
+  if(!nomor) nomor=nextNomorJual(tanggal);
+  else if((d.penjualan||[]).some(function(x){ return String(x.nomor||'')===nomor && String(x.id||'').indexOf('tmp')!==0; })) nomor=nextNomorJual(tanggal);
   const metode2=metode==='campuran'?String(p.metode2||'hutang').toLowerCase():'';
   const bayar2=metode==='campuran'?roundM(total-bayar):0;
   d.penjualan.push({id,nomor,tanggal,pelanggan_id:pelangganId,user_id:userId,kasir_nama:kasirNama,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,status:'selesai',catatan:p.catatan||''});
@@ -1999,6 +2002,19 @@ function localPenjualan(p){
   try{ jurnalDariPenjualan({id:id,nomor:nomor,tanggal:tanggal,total:total,bayar:bayar,metode:metode,status:'selesai',diskon:diskon,items:outItems}); }catch(e){}
   saveDB();
   return {id,nomor,tanggal,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,pelanggan_id:pelangganId,user_id:userId,kasir_nama:kasirNama,items:outItems};
+}
+function nextNomorJual(tgl){
+  var hari=String(tgl||nowIso()).slice(0,10).replace(/-/g,'');
+  var pre='PJ-'+hari+'-';
+  var max=0;
+  (STATE.data.penjualan||[]).forEach(function(p){
+    if(String(p.id||'').indexOf('tmp')===0) return;
+    var n=String(p.nomor||'');
+    if(n.indexOf(pre)!==0) return;
+    var k=parseInt(n.slice(pre.length),10);
+    if(k) max=Math.max(max, k);
+  });
+  return pre+String(max+1).padStart(3,'0');
 }
 function nextNomorBeli(){
   const d=todayStr().replace(/-/g,'');
@@ -3649,7 +3665,7 @@ function previewStruk(payload, totals){
   else if(isNonTunai(payload.metode)){ bayar=totals.total; kembalian=0; }
   else kembalian=roundM(bayar-totals.total);
   return {
-    id:'tmp'+Date.now(), nomor:'PJ-'+todayStr().replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10),
+    id:'tmp'+Date.now(), nomor:payload.nomor||nextNomorJual(payload.tanggal||nowIso()),
     tanggal:payload.tanggal||nowIso(), pelanggan_id:payload.pelanggan_id, user_id:payload.user_id||(STATE.user&&STATE.user.id), kasir_nama:payload.kasir_nama||'',
     subtotal:totals.sub, diskon:totals.diskon, total:totals.total, bayar:bayar, kembalian:kembalian,
     metode:payload.metode, metode2:payload.metode2||'', bayar2:payload.bayar2||0, status:'selesai', catatan:payload.catatan||'', items:items
@@ -3694,7 +3710,7 @@ async function prosesBayar(){
     catatanBayar=catatanBayar?catatanBayar+' · '+note:note;
   }
   const adm=bacaBayarAdmin();
-  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar,user_id:adm.user_id,tanggal:adm.tanggal,kasir_nama:adm.kasir_nama};
+  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar,user_id:adm.user_id,tanggal:adm.tanggal,kasir_nama:adm.kasir_nama,nomor:nextNomorJual(adm.tanggal)};
   window._bayarLock=true;
   const slow=!useSb() && !onAppsScript() && !window._wpBridgeOk && !!gasUrl();
   try{
@@ -7028,5 +7044,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd28774c79fd30',t:'MTc5NTU3MzA1Nw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd28774c79fd30',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd3486284b26da',t:'MTc5NTU3MzU1MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd3486284b26da',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
