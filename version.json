@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.62",
+  "version": "2026.09.06.63",
   "tanggal": "2026-09-10",
-  "catatan": "Kasir: diskon/potongan harga per item di keranjang."
+  "catatan": "Bayar kombinasi tunai+QRIS/debit/transfer/hutang. Stok pembelian bertambah dari qty."
 }
