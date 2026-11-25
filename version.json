@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.64",
+  "version": "2026.09.06.65",
   "tanggal": "2026-09-10",
-  "catatan": "Admin kasir: ubah nama kasir dan tanggal transaksi."
+  "catatan": "Nomor invoice penjualan reset tiap hari mulai dari 1."
 }
