@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.65",
+  "version": "2026.09.06.66",
   "tanggal": "2026-09-10",
-  "catatan": "Nomor invoice penjualan reset tiap hari mulai dari 1."
+  "catatan": "Pembayaran dan tanggal pindah ke keranjang."
 }
