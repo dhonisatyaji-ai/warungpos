@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.63",
+  "version": "2026.09.06.64",
   "tanggal": "2026-09-10",
-  "catatan": "Bayar kombinasi tunai+QRIS/debit/transfer/hutang. Stok pembelian bertambah dari qty."
+  "catatan": "Admin kasir: ubah nama kasir dan tanggal transaksi."
 }
