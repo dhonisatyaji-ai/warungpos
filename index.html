@@ -210,9 +210,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cart .kembali-box{margin-top:8px;padding:8px 10px;border-radius:10px}
 .cart .kembali-box span{font-size:11px}
 .cart .kembali-box b{font-size:14px}
-.cart-admin{margin:8px 0 6px;padding:8px;border:1px dashed var(--line);border-radius:12px;background:#fffdf8}
-.cart-admin .fld{margin:4px 0}
 .cart .fld{margin:8px 0 4px}
+.cart-meta{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px}
+.cart-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center}
+.cart-row > label{margin:0;font-size:12px;font-weight:700;color:#57534e;line-height:1.2}
+.cart-row select,.cart-row input[type=datetime-local]{width:100%;margin:0;padding:8px 10px;border-radius:10px;min-width:0}
+.cart-row .pel-row{min-width:0}
 .pel-row{display:flex;gap:8px;align-items:stretch}
 .pel-row select{flex:1;min-width:0}
 .pel-row button{flex:none;width:46px;padding:0;font-size:22px;line-height:1;font-weight:800}
@@ -589,10 +592,23 @@ html.has-session .boot-splash:not(.hide){display:grid}
             <button type="button" class="act-reprint" id="btnCetakUlangHari" onclick="bukaCetakUlangHariIni()">Cetak ulang</button>
             <button type="button" class="act-clear" onclick="clearCart()">Kosongkan</button>
           </div>
-          <label class="fld">Pelanggan</label>
-          <div class="pel-row">
-            <select id="pelangganKasir"><option value="P0" selected>Umum</option></select>
-            <button type="button" class="btn" title="Tambah pelanggan" onclick="openPelanggan()">+</button>
+          <div class="cart-meta">
+            <div class="cart-row" id="rowKasir">
+              <label>Nama kasir</label>
+              <select id="payKasir" onchange="onPayKasirUbah()"></select>
+              <input id="payKasirNama" type="hidden">
+            </div>
+            <div class="cart-row">
+              <label>Pelanggan</label>
+              <div class="pel-row">
+                <select id="pelangganKasir"><option value="P0" selected>Umum</option></select>
+                <button type="button" class="btn" title="Tambah pelanggan" onclick="openPelanggan()">+</button>
+              </div>
+            </div>
+            <div class="cart-row" id="rowTgl">
+              <label>Tanggal</label>
+              <input id="payTgl" type="datetime-local">
+            </div>
           </div>
           </div>
           <div class="cart-items" id="cartItems"><div class="empty">Keranjang masih kosong</div></div>
@@ -611,13 +627,6 @@ html.has-session .boot-splash:not(.hide){display:grid}
               <div id="diskonKetRow" class="app-hidden"><span></span><span id="diskonKet" class="muted"></span></div>
             </div>
             <div class="grand"><span>Total</span><span id="tGrand">Rp 0</span></div>
-          </div>
-          <div id="boxAdminKasir" class="app-hidden cart-admin">
-            <div class="two">
-              <div><label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()"></select>
-                <input id="payKasirNama" placeholder="Nama di struk" style="margin-top:6px"></div>
-              <div><label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local"></div>
-            </div>
           </div>
           <label class="fld">Catatan</label>
           <input id="catatanKasir" placeholder="Opsional">
@@ -1080,7 +1089,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.67';
+const APP_VERSION = '2026.09.06.68';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3562,19 +3571,23 @@ function hitungKembalian(){
 function isiPanelBayarKasir(){
   if(!window._pay) window._pay='tunai';
   if(!window._pay2) window._pay2='qris';
-  var adm=document.getElementById('boxAdminKasir');
-  if(adm) adm.classList.toggle('app-hidden', !isAdmin());
+  var admin=isAdmin();
   var sel=document.getElementById('payKasir');
-  if(sel && isAdmin()){
+  if(sel){
     var cur=sel.value||(STATE.user&&STATE.user.id);
-    sel.innerHTML=htmlOptKasir(cur);
+    sel.innerHTML=htmlOptKasir(admin?cur:(STATE.user&&STATE.user.id));
+    sel.disabled=!admin;
   }
   var nm=document.getElementById('payKasirNama');
-  if(nm && isAdmin() && !String(nm.value||'').trim()){
+  if(nm && !String(nm.value||'').trim()){
     nm.value=(STATE.user&&(STATE.user.nama||STATE.user.username))||'';
   }
+  if(nm && sel) onPayKasirUbah();
   var pt=document.getElementById('payTgl');
-  if(pt && isAdmin() && !pt.value) pt.value=isoToLocalInput(nowIso());
+  if(pt){
+    if(!pt.value) pt.value=isoToLocalInput(nowIso());
+    pt.disabled=!admin;
+  }
 }
 function syncPayPas(){
   var tot=0;
@@ -7102,5 +7115,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd4bbe98faac79',t:'MTc5NTU3NDUwMg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd4bbe98faac79',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd595da9822a72',t:'MTc5NTU3NTA2MA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd595da9822a72',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
