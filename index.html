@@ -214,6 +214,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .citem-info{min-width:0}
 .citem .nm{font-weight:700;font-size:12px;line-height:1.3;word-break:break-word;white-space:normal}
 .citem .sub{font-size:10px;color:var(--muted);line-height:1.3}
+.citem-disc{display:inline-block;margin-top:2px;border:0;background:transparent;color:var(--forest);font-size:10px;font-weight:800;padding:0;cursor:pointer;text-align:left}
+.citem-disc.on{color:#b45309}
 .qtyrow{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:0}
 .qtyrow b{font-size:12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
 .qtyctl{display:flex;align-items:center;gap:4px}
@@ -1064,7 +1066,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.61';
+const APP_VERSION = '2026.09.06.62';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1885,9 +1887,11 @@ function localPenjualan(p){
     }
     if(qty<=0) throw new Error('Qty tidak valid');
     if(num(pr.stok)+1e-9<qty) throw new Error('Stok '+pr.nama+' tidak cukup');
-    const line=roundM(kode==='berat'&&modeBerat==='nominal'?nominal:qty*harga);
+    let line=roundM(kode==='berat'&&modeBerat==='nominal'?nominal:qty*harga);
+    const discAmt=lineDiskon(it, line);
+    line=roundM(Math.max(0, line-discAmt));
     subtotal+=line;
-    norm.push({pr,qty,harga,isDingin,modeBerat,nominal,line,satuan:pr.satuan});
+    norm.push({pr,qty,harga,isDingin,modeBerat,nominal,line,discAmt,satuan:pr.satuan});
   });
   const diskon=num(p.diskon), total=roundM(Math.max(0,subtotal-diskon));
   let bayar=num(p.bayar), kembalian=0;
@@ -1900,9 +1904,9 @@ function localPenjualan(p){
   d.penjualan.push({id,nomor,tanggal,pelanggan_id:pelangganId,user_id:STATE.user&&STATE.user.id,subtotal,diskon,total,bayar,kembalian,metode,status:'selesai',catatan:p.catatan||''});
   const outItems=[];
   norm.forEach(n=>{
-    d.penjualanItem.push({id:uid('PI'),penjualan_id:id,produk_id:n.pr.id,nama_produk:n.pr.nama,qty:n.qty,satuan:n.satuan,harga_satuan:n.harga,is_dingin:n.isDingin?1:0,mode_berat:n.modeBerat,nominal:n.nominal,subtotal:n.line});
+    d.penjualanItem.push({id:uid('PI'),penjualan_id:id,produk_id:n.pr.id,nama_produk:n.pr.nama,qty:n.qty,satuan:n.satuan,harga_satuan:n.harga,is_dingin:n.isDingin?1:0,mode_berat:n.modeBerat,nominal:n.nominal,diskon_item:n.discAmt||0,subtotal:n.line});
     n.pr.stok=roundQ(num(n.pr.stok)-n.qty);
-    outItems.push({produk_id:n.pr.id,nama_produk:n.pr.nama,qty:n.qty,satuan:n.satuan,harga_satuan:n.harga,is_dingin:n.isDingin?1:0,mode_berat:n.modeBerat,nominal:n.nominal,subtotal:n.line});
+    outItems.push({produk_id:n.pr.id,nama_produk:n.pr.nama,qty:n.qty,satuan:n.satuan,harga_satuan:n.harga,is_dingin:n.isDingin?1:0,mode_berat:n.modeBerat,nominal:n.nominal,diskon_item:n.discAmt||0,subtotal:n.line});
   });
   const hutangNom = metode==='hutang'?total:(metode==='campuran'?roundM(total-bayar):0);
   if(hutangNom>0) catatHutang(pelangganId,'hutang',id,hutangNom,'Belanja '+nomor);
@@ -3059,6 +3063,15 @@ function hitungPromoPaket(){
   });
   return {hemat:roundM(hemat), rows:rows};
 }
+function lineDiskon(it, sub){
+  var raw=num(it.disc);
+  if(raw<=0) return 0;
+  var mode=String(it.disc_mode||'rp');
+  var d=mode==='pct' ? roundM(sub*Math.min(100, Math.max(0, raw))/100) : roundM(raw);
+  if(d<0) d=0;
+  if(d>sub) d=sub;
+  return d;
+}
 function lineCalc(it){
   const c=lineCalcRaw(it);
   const p=c.p, kode=c.kode, harga=c.harga, qty=c.qty;
@@ -3069,7 +3082,9 @@ function lineCalc(it){
     if(pr && kode!=='berat') sub=subBertingkat(qty, pr.tingkat, harga);
     else sub=roundM(qty*harga);
   }
-  return {p:p,kode:kode,harga:harga,qty:qty,sub:sub};
+  const discAmt=lineDiskon(it, sub);
+  sub=roundM(Math.max(0, sub-discAmt));
+  return {p:p,kode:kode,harga:harga,qty:qty,sub:sub,discAmt:discAmt,sub0:roundM(sub+discAmt)};
 }
 function addCart(it){
   const c=lineCalc(it);
@@ -3093,7 +3108,10 @@ function renderCart(){
     const qtyCtl = c.kode==='berat' ? '<span class="muted">'+fmtQty(c.qty,c.p.satuan)+'</span>' :
       '<div class="qtyctl"><button onclick="chgQty('+i+',-1)">−</button><b>'+it.qty+'</b><button onclick="chgQty('+i+',1)">+</button></div>';
     var subdet=(c.p.sku?esc(c.p.sku)+' · ':'')+(det?det+' · ':'')+rp(c.harga)+(c.kode==='berat'?'/'+c.p.satuan:'');
-    return '<div class="citem"><div class="citem-info"><div class="nm">'+esc(c.p.nama)+'</div><div class="sub">'+subdet+'</div></div>'+
+    var discBtn=c.discAmt
+      ? '<button type="button" class="citem-disc on" onclick="openDiskonItem('+i+')">Potong '+rp(c.discAmt)+(String(it.disc_mode)==='pct'?' ('+num(it.disc)+'%)':'')+'</button>'
+      : '<button type="button" class="citem-disc" onclick="openDiskonItem('+i+')">Diskon</button>';
+    return '<div class="citem"><div class="citem-info"><div class="nm">'+esc(c.p.nama)+'</div><div class="sub">'+subdet+'</div>'+discBtn+'</div>'+
       '<div class="qtyrow">'+qtyCtl+'<b>'+rp(c.sub)+'</b><button class="btn-ghost btn-sm" onclick="delCart('+i+')">✕</button></div></div>';
   }).join('');
   const tot=cartTotals();
@@ -3191,7 +3209,10 @@ function izinkanDiskon(){
     if(!ok) return toast('Kode Authenticator salah');
     STATE.diskonAuthOk=true;
     closeModal();
-    renderCart();
+    if(STATE._discItemPending){
+      var pend=STATE._discItemPending; STATE._discItemPending=null;
+      terapkanDiskonItem(pend.i, pend.mode, pend.raw);
+    } else renderCart();
     toast('Admin mengizinkan diskon');
   });
 }
@@ -3228,6 +3249,82 @@ function buatTotpBaru(){
 }
 function chgQty(i,d){ STATE.cart[i].qty=Math.max(1, num(STATE.cart[i].qty)+d); renderCart(); }
 function delCart(i){ STATE.cart.splice(i,1); renderCart(); }
+function openDiskonItem(i){
+  var it=STATE.cart[i]; if(!it) return;
+  var c=lineCalc(it);
+  var mode=String(it.disc_mode||'rp')==='pct'?'pct':'rp';
+  var raw=num(it.disc);
+  modal('<h3>Diskon item</h3><p class="hint">'+esc(c.p.nama)+' · baris '+rp(c.sub0)+'</p>'+
+    '<div class="choice" id="discItemMode">'+
+      '<button type="button" data-m="rp" class="'+(mode==='rp'?'sel':'')+'">Rp</button>'+
+      '<button type="button" data-m="pct" class="'+(mode==='pct'?'sel':'')+'">%</button></div>'+
+    '<label class="fld">Potongan</label><input id="inDiscItem" type="number" min="0" step="any" value="'+(raw||'')+'" placeholder="'+(mode==='pct'?'0–100':'Nominal Rp')+'" inputmode="decimal">'+
+    '<div class="row-btns" style="margin-top:12px">'+
+      '<button class="btn-ghost" type="button" id="btnDiscItemHapus">Hapus</button>'+
+      '<button class="btn" type="button" id="btnDiscItemSimpan">Simpan</button></div>');
+  window._discItemMode=mode;
+  var box=document.getElementById('discItemMode');
+  if(box){
+    box.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        window._discItemMode=b.getAttribute('data-m')||'rp';
+        box.querySelectorAll('button').forEach(function(x){ x.classList.toggle('sel', x===b); });
+        var inp=document.getElementById('inDiscItem');
+        if(inp) inp.placeholder=window._discItemMode==='pct'?'0–100':'Nominal Rp';
+      });
+    });
+  }
+  function baca(){ return {mode:window._discItemMode||'rp', raw:num((document.getElementById('inDiscItem')||{}).value)}; }
+  var hapus=document.getElementById('btnDiscItemHapus');
+  var simpan=document.getElementById('btnDiscItemSimpan');
+  if(hapus) hapus.addEventListener('click', function(){ terapkanDiskonItem(i, 'rp', 0); closeModal(); });
+  if(simpan) simpan.addEventListener('click', function(){
+    var v=baca();
+    if(v.raw<0) return toast('Potongan tidak valid');
+    if(v.mode==='pct' && v.raw>100) return toast('Maksimal 100%');
+    if(v.raw>0 && butuhOtorisasiDiskon() && !STATE.diskonAuthOk){
+      STATE._discItemPending={i:i, mode:v.mode, raw:v.raw};
+      closeModal();
+      bukaOtorisasiDiskonItem(v, c);
+      return;
+    }
+    terapkanDiskonItem(i, v.mode, v.raw);
+    closeModal();
+  });
+  var inp=document.getElementById('inDiscItem');
+  if(inp){
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); if(simpan) simpan.click(); } });
+    setTimeout(function(){ inp.focus(); if(inp.select) inp.select(); }, 40);
+  }
+}
+function bukaOtorisasiDiskonItem(v, c){
+  v=v||STATE._discItemPending||{};
+  var label=v.mode==='pct' ? (v.raw+'%') : rp(v.raw);
+  var nama=c&&c.p?c.p.nama:'item';
+  var pset=(STATE.data&&STATE.data.pengaturan)||{};
+  if(!pset.totp_secret) return toast('Admin belum mengatur Authenticator. Buka Pengaturan.');
+  modal('<h3>Minta admin</h3><p class="hint">Diskon item <b>'+esc(nama)+'</b> · <b>'+esc(label)+'</b>. Kode 6 angka Authenticator.</p>'+
+    '<label class="fld">Kode Authenticator</label><input id="authTotp" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">'+
+    '<button type="button" class="btn full" style="margin-top:10px" id="btnIzinkanDiskon">Izinkan diskon</button>');
+  var go=document.getElementById('btnIzinkanDiskon');
+  if(go) go.addEventListener('click', function(e){ e.preventDefault(); izinkanDiskon(); });
+  var inp=document.getElementById('authTotp');
+  if(inp){
+    inp.addEventListener('input', function(){
+      this.value=String(this.value||'').replace(/\D/g,'').slice(0,6);
+      if(this.value.length===6) izinkanDiskon();
+    });
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); izinkanDiskon(); }});
+    setTimeout(function(){ inp.focus(); }, 50);
+  }
+}
+function terapkanDiskonItem(i, mode, raw){
+  var it=STATE.cart[i]; if(!it) return;
+  raw=num(raw);
+  if(raw<=0){ it.disc=0; it.disc_mode='rp'; }
+  else { it.disc=raw; it.disc_mode=mode==='pct'?'pct':'rp'; }
+  renderCart();
+}
 function clearCart(){
   STATE.cart=[]; STATE.diskonAuthOk=false; STATE._diskonPending=null;
   document.getElementById('diskonKasir').value=0; document.getElementById('catatanKasir').value='';
@@ -3263,7 +3360,8 @@ function syncCartCount(){
   if(by) by.textContent=info.lines?('Bayar · '+txt+' (F8)'):'Bayar (F8)';
 }
 function cartTotals(){
-  let sub=0; STATE.cart.forEach(function(it){ sub+=lineCalc(it).sub; });
+  let sub=0, discItem=0;
+  STATE.cart.forEach(function(it){ var c=lineCalc(it); sub+=c.sub; discItem+=num(c.discAmt); });
   const paket=hitungPromoPaket();
   const el=document.getElementById('diskonKasir');
   const mode=(document.getElementById('diskonMode')||{}).value||'rp';
@@ -3277,7 +3375,7 @@ function cartTotals(){
   try{ pending=butuhOtorisasiDiskon() && !STATE.diskonAuthOk && raw>0; }catch(e){}
   const diskonManual=pending?0:hitung;
   const diskon=roundM(Math.max(0, diskonManual)+paket.hemat);
-  return {sub:roundM(sub), diskon:diskon, diskonManual:diskonManual, diskonMode:mode, promo:paket, total:Math.max(0,roundM(sub-diskon)), pending:pending, diskonRaw:raw, diskonPending:hitung};
+  return {sub:roundM(sub), diskon:diskon, diskonManual:diskonManual, diskonMode:mode, promo:paket, diskonItem:roundM(discItem), total:Math.max(0,roundM(sub-diskon)), pending:pending, diskonRaw:raw, diskonPending:hitung};
 }
 
 function metodeLabel(m){
@@ -3405,7 +3503,7 @@ function previewStruk(payload, totals){
     const c=lineCalc(it);
     return {
       produk_id:it.produk_id, nama_produk:c.p?c.p.nama:'', qty:c.qty, satuan:c.p?c.p.satuan:'pcs',
-      harga_satuan:c.harga, subtotal:c.sub, is_dingin:it.is_dingin?1:0,
+      harga_satuan:c.harga, subtotal:c.sub, diskon_item:c.discAmt||0, is_dingin:it.is_dingin?1:0,
       mode_berat:it.mode_berat||'', nominal:it.nominal||0
     };
   });
@@ -3441,14 +3539,15 @@ async function prosesBayar(){
     });
   }catch(e){ return toast(e.message); }
   const items=STATE.cart.map(it=>{
-    return {produk_id:it.produk_id,qty:it.qty,is_dingin:it.is_dingin?1:0,mode_berat:it.mode_berat||'',nominal:it.nominal||0,satuan_input:it.satuan_input};
+    const c=lineCalc(it);
+    return {produk_id:it.produk_id,qty:it.qty,is_dingin:it.is_dingin?1:0,mode_berat:it.mode_berat||'',nominal:it.nominal||0,satuan_input:it.satuan_input,disc_mode:it.disc_mode||'rp',disc:num(it.disc),diskon_item:c.discAmt||0};
   });
   let catatanBayar=document.getElementById('catatanKasir').value||'';
   if(t.promo && t.promo.rows && t.promo.rows.length){
     const note=t.promo.rows.map(function(r){ return 'Promo '+r.nama+' x'+r.n; }).join(', ');
     catatanBayar=catatanBayar?catatanBayar+' · '+note:note;
   }
-  const payload={items,pelanggan_id,metode,bayar,diskon:t.diskon,catatan:catatanBayar};
+  const payload={items,pelanggan_id,metode,bayar,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar};
   window._bayarLock=true;
   const slow=!useSb() && !onAppsScript() && !window._wpBridgeOk && !!gasUrl();
   try{
@@ -3515,7 +3614,9 @@ function buatStrukHtml(res){
     else if(find(STATE.data.produk,it.produk_id) && jenisKode(find(STATE.data.produk,it.produk_id))==='minuman') nm+=' (Biasa)';
     if(it.mode_berat==='nominal') nm+=' · '+fmtQty(it.qty,it.satuan)+' (nom '+rp(it.nominal)+')';
     else if(it.mode_berat) nm+=' · '+fmtQty(it.qty,it.satuan);
-    return '<div class="sr"><span>'+esc(nm)+'<br><small>'+fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'</small></span>'+rpKolom(it.subtotal)+'</div>';
+    var small=fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan);
+    if(num(it.diskon_item)) small+=' · potong '+rp(it.diskon_item);
+    return '<div class="sr"><span>'+esc(nm)+'<br><small>'+small+'</small></span>'+rpKolom(it.subtotal)+'</div>';
   }).join('');
   const sr=function(a,html){
     return '<div class="sr"><span>'+a+'</span>'+html+'</div>';
@@ -3579,7 +3680,7 @@ function buatStrukTeks(res){
     if(it.mode_berat==='nominal') nm+=' · '+fmtQty(it.qty,it.satuan)+' (nom '+rp(it.nominal)+')';
     else if(it.mode_berat) nm+=' · '+fmtQty(it.qty,it.satuan);
     out.push(nm);
-    out.push(fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+'  '+rp(it.subtotal));
+    out.push(fmtQty(it.qty,it.satuan)+' x '+rp(it.harga_satuan)+(num(it.diskon_item)?(' potong '+rp(it.diskon_item)):'')+'  '+rp(it.subtotal));
   });
   out.push(line);
   out.push('Subtotal : '+rp(res.subtotal));
@@ -6692,5 +6793,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fc48313dda81d7',t:'MTc5NTU2Mzg3MA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fc48313dda81d7',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
