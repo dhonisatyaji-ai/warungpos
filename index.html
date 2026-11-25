@@ -1066,7 +1066,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.63';
+const APP_VERSION = '2026.09.06.64';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -1154,6 +1154,58 @@ function hideGasBanner(){
 function uid(p){ return p + Date.now().toString(36) + Math.floor(Math.random()*900+100); }
 function nowIso(){ const d=new Date(); const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds()); }
 function todayStr(){ return nowIso().slice(0,10); }
+function isAdmin(){ return !!(STATE.user && STATE.user.role==='admin'); }
+function isoToLocalInput(s){
+  s=String(s||nowIso()).replace(' ','T');
+  return s.slice(0,16);
+}
+function localInputToIso(s){
+  s=String(s||'').trim().replace(' ','T');
+  if(!s) return nowIso();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) s+='T00:00:00';
+  if(s.length===16) s+=':00';
+  if(s.length===19 && s.charAt(10)==='T') return s;
+  return s;
+}
+function kasirAktifList(){
+  var list=(STATE.data.user||[]).filter(function(u){ return Number(u.aktif)!==0; });
+  if(!list.length && STATE.user) list=[STATE.user];
+  return list;
+}
+function htmlOptKasir(selId){
+  selId=String(selId||(STATE.user&&STATE.user.id)||'');
+  return kasirAktifList().map(function(u){
+    return '<option value="'+esc(String(u.id))+'"'+(String(u.id)===selId?' selected':'')+'>'+esc(u.nama||u.username||u.id)+'</option>';
+  }).join('');
+}
+function namaKasirDari(res){
+  if(res && String(res.kasir_nama||'').trim()) return String(res.kasir_nama).trim();
+  var u=find(STATE.data.user, res&&res.user_id)||STATE.user||{};
+  return u.nama||u.username||'';
+}
+function onPayKasirUbah(){
+  var sel=document.getElementById('payKasir');
+  var inp=document.getElementById('payKasirNama');
+  if(!sel||!inp) return;
+  var u=find(STATE.data.user, sel.value)||{};
+  inp.value=u.nama||u.username||'';
+}
+function bacaBayarAdmin(){
+  var out={
+    user_id:STATE.user&&STATE.user.id,
+    tanggal:nowIso(),
+    kasir_nama:(STATE.user&&STATE.user.nama)||(STATE.user&&STATE.user.username)||''
+  };
+  if(!isAdmin()) return out;
+  var sel=document.getElementById('payKasir');
+  var inp=document.getElementById('payKasirNama');
+  var pt=document.getElementById('payTgl');
+  if(sel && sel.value) out.user_id=sel.value;
+  if(inp && String(inp.value||'').trim()) out.kasir_nama=String(inp.value).trim();
+  else out.kasir_nama=(find(STATE.data.user,out.user_id)||STATE.user||{}).nama||out.kasir_nama;
+  if(pt && pt.value) out.tanggal=localInputToIso(pt.value);
+  return out;
+}
 function tglLokal(t){
   var s=String(t==null?'':t).trim();
   if(!s) return '';
@@ -1929,11 +1981,13 @@ function localPenjualan(p){
   }
   else if(isNonTunai(metode)){ bayar=total; kembalian=0; }
   else { if(bayar<total) throw new Error('Uang bayar kurang'); kembalian=roundM(bayar-total); }
-  const id=uid('PJ'), nomor='PJ-'+todayStr().replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10);
-  const tanggal=nowIso();
+  const tanggal=p.tanggal?localInputToIso(p.tanggal):nowIso();
+  const userId=p.user_id||(STATE.user&&STATE.user.id);
+  const kasirNama=String(p.kasir_nama||(find(d.user,userId)||STATE.user||{}).nama||'').trim();
+  const id=uid('PJ'), nomor='PJ-'+String(tanggal).slice(0,10).replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10);
   const metode2=metode==='campuran'?String(p.metode2||'hutang').toLowerCase():'';
   const bayar2=metode==='campuran'?roundM(total-bayar):0;
-  d.penjualan.push({id,nomor,tanggal,pelanggan_id:pelangganId,user_id:STATE.user&&STATE.user.id,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,status:'selesai',catatan:p.catatan||''});
+  d.penjualan.push({id,nomor,tanggal,pelanggan_id:pelangganId,user_id:userId,kasir_nama:kasirNama,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,status:'selesai',catatan:p.catatan||''});
   const outItems=[];
   norm.forEach(n=>{
     d.penjualanItem.push({id:uid('PI'),penjualan_id:id,produk_id:n.pr.id,nama_produk:n.pr.nama,qty:n.qty,satuan:n.satuan,harga_satuan:n.harga,is_dingin:n.isDingin?1:0,mode_berat:n.modeBerat,nominal:n.nominal,diskon_item:n.discAmt||0,subtotal:n.line});
@@ -1944,7 +1998,7 @@ function localPenjualan(p){
   if(hutangNom>0) catatHutang(pelangganId,'hutang',id,hutangNom,'Belanja '+nomor);
   try{ jurnalDariPenjualan({id:id,nomor:nomor,tanggal:tanggal,total:total,bayar:bayar,metode:metode,status:'selesai',diskon:diskon,items:outItems}); }catch(e){}
   saveDB();
-  return {id,nomor,tanggal,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,pelanggan_id:pelangganId,items:outItems};
+  return {id,nomor,tanggal,subtotal,diskon,total,bayar,bayar2,kembalian,metode,metode2,pelanggan_id:pelangganId,user_id:userId,kasir_nama:kasirNama,items:outItems};
 }
 function nextNomorBeli(){
   const d=todayStr().replace(/-/g,'');
@@ -3484,7 +3538,14 @@ function openBayar(){
   const pas=t.total;
   const rb1=Math.ceil(t.total/1000)*1000;
   const rb2=Math.ceil(t.total/50000)*50000;
-  modal('<h3>Pembayaran</h3><p>'+esc(cartQtyText())+' · Total <b>'+rp(t.total)+'</b></p>'+
+  var adminBox='';
+  if(isAdmin()){
+    adminBox='<div class="two" id="boxAdminKasir" style="margin:8px 0 10px">'+
+      '<div><label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()">'+htmlOptKasir()+'</select>'+
+      '<input id="payKasirNama" value="'+esc((STATE.user&&(STATE.user.nama||STATE.user.username))||'')+'" placeholder="Nama di struk" style="margin-top:6px"></div>'+
+      '<div><label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local" value="'+esc(isoToLocalInput(nowIso()))+'"></div></div>';
+  }
+  modal('<h3>Pembayaran</h3><p>'+esc(cartQtyText())+' · Total <b>'+rp(t.total)+'</b></p>'+adminBox+
     '<div class="choice pay-grid">'+
     '<button type="button" data-pay="tunai" class="sel" onclick="selPay(\'tunai\')">Tunai</button>'+
     '<button type="button" data-pay="qris" onclick="selPay(\'qris\')">QRIS</button>'+
@@ -3589,7 +3650,7 @@ function previewStruk(payload, totals){
   else kembalian=roundM(bayar-totals.total);
   return {
     id:'tmp'+Date.now(), nomor:'PJ-'+todayStr().replace(/-/g,'')+'-'+Math.floor(Math.random()*90+10),
-    tanggal:nowIso(), pelanggan_id:payload.pelanggan_id, user_id:STATE.user&&STATE.user.id,
+    tanggal:payload.tanggal||nowIso(), pelanggan_id:payload.pelanggan_id, user_id:payload.user_id||(STATE.user&&STATE.user.id), kasir_nama:payload.kasir_nama||'',
     subtotal:totals.sub, diskon:totals.diskon, total:totals.total, bayar:bayar, kembalian:kembalian,
     metode:payload.metode, metode2:payload.metode2||'', bayar2:payload.bayar2||0, status:'selesai', catatan:payload.catatan||'', items:items
   };
@@ -3632,7 +3693,8 @@ async function prosesBayar(){
     const note='Tunai '+rp(bayar)+' + '+metodeLabel(metode2)+' '+rp(roundM(t.total-bayar));
     catatanBayar=catatanBayar?catatanBayar+' · '+note:note;
   }
-  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar};
+  const adm=bacaBayarAdmin();
+  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar,user_id:adm.user_id,tanggal:adm.tanggal,kasir_nama:adm.kasir_nama};
   window._bayarLock=true;
   const slow=!useSb() && !onAppsScript() && !window._wpBridgeOk && !!gasUrl();
   try{
@@ -3724,7 +3786,7 @@ function buatStrukHtml(res){
     '<hr class="dashline">'+(String(res.status)==='batal'?'<div><b>BATAL</b></div>':'')+
     strukKv('No.inv', res.nomor)+
     strukKv('Tanggal/waktu', strukWaktu(res.tanggal))+
-    strukKv('Kasir', (find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'')+
+    strukKv('Kasir', namaKasirDari(res))+
     strukKv('Pelanggan', pl?pl.nama:'-')+
     '<hr class="dashline">'+items+
     '<hr class="dashline">'+sr('Subtotal', rpKolom(res.subtotal))+
@@ -3746,7 +3808,7 @@ function waNomor(telp){
 function buatStrukTeks(res){
   var set=(STATE.data&&STATE.data.pengaturan)||{};
   var pl=find(STATE.data.pelanggan,res.pelanggan_id);
-  var kasir=(find(STATE.data.user,res.user_id)||STATE.user||{}).nama||'';
+  var kasir=namaKasirDari(res);
   var line='------------------------------';
   var out=[];
   out.push('*'+String(set.toko_nama||'WarungPOS')+'*');
@@ -3807,6 +3869,7 @@ function struk(res){
   const inner=buatStrukHtml(res);
   let btns='<button class="btn" type="button" onclick="printStruk()">Cetak struk</button>';
   btns+='<button class="btn-ghost" type="button" onclick="shareStrukWa()">WhatsApp</button>';
+  if(isAdmin()) btns+='<button class="btn-ghost" type="button" onclick="openEditNota()">Ubah kasir/tanggal</button>';
   if(bisaBatalPj(res)) btns+='<button class="btn-ghost" type="button" data-batal-id="'+esc(String(res.id||''))+'">Batalkan</button>';
   modal(inner+'<div class="row-btns" style="margin-top:10px">'+btns+'</div>');
   const b=document.querySelector('#modalBg [data-batal-id]');
@@ -3815,6 +3878,44 @@ function struk(res){
     batalPenjualanUi(b.getAttribute('data-batal-id')).then(function(ok){ if(ok) closeModal(); });
   });
   if(num(printerCfg('struk').auto) && String(res.status)!=='batal') setTimeout(function(){ printDokumen('struk', inner); }, 280);
+}
+function openEditNota(){
+  if(!isAdmin()) return toast('Hanya admin');
+  var res=window._strukLast; if(!res) return toast('Tidak ada struk');
+  modal('<h3>Ubah nota</h3><p class="hint">'+esc(res.nomor||'')+'</p>'+
+    '<label class="fld">Nama kasir</label><select id="payKasir" onchange="onPayKasirUbah()">'+htmlOptKasir(res.user_id)+'</select>'+
+    '<input id="payKasirNama" value="'+esc(namaKasirDari(res))+'" placeholder="Nama di struk" style="margin-top:6px">'+
+    '<label class="fld">Tanggal transaksi</label><input id="payTgl" type="datetime-local" value="'+esc(isoToLocalInput(res.tanggal||nowIso()))+'">'+
+    '<button class="btn full" type="button" id="btnSimpanEditNota" style="margin-top:12px">Simpan</button>');
+  var b=document.getElementById('btnSimpanEditNota');
+  if(b) b.addEventListener('click', simpanEditNota);
+}
+async function simpanEditNota(){
+  if(!isAdmin()) return toast('Hanya admin');
+  var res=window._strukLast; if(!res) return toast('Tidak ada struk');
+  var adm=bacaBayarAdmin();
+  res.user_id=adm.user_id;
+  res.kasir_nama=adm.kasir_nama;
+  res.tanggal=adm.tanggal;
+  var row=find(STATE.data.penjualan, res.id);
+  if(!row && res.nomor) row=(STATE.data.penjualan||[]).find(function(p){ return String(p.nomor)===String(res.nomor); });
+  if(row){
+    row.user_id=res.user_id;
+    row.kasir_nama=res.kasir_nama;
+    row.tanggal=res.tanggal;
+    try{ saveDB(); }catch(e){}
+  }
+  if(useSb() && res.id && String(res.id).indexOf('tmp')!==0 && typeof sbFetch==='function'){
+    try{
+      await sbFetch('/rest/v1/penjualan?id=eq.'+encodeURIComponent(res.id), {
+        method:'PATCH',
+        body:{tanggal:res.tanggal, user_id:res.user_id, kasir_nama:res.kasir_nama}
+      });
+    }catch(e){}
+  }
+  window._strukLast=res;
+  struk(res);
+  toast('Kasir dan tanggal nota disimpan');
 }
 function printStruk(){
   const el=document.querySelector('#modalBg .struk');
@@ -6684,9 +6785,10 @@ function catatPenjualanState(res, payload, tot){
   var row=Object.assign({}, res, {
     id:res.id,
     nomor:res.nomor,
-    tanggal:res.tanggal||nowIso(),
+    tanggal:res.tanggal||(payload&&payload.tanggal)||nowIso(),
     pelanggan_id:res.pelanggan_id||(payload&&payload.pelanggan_id),
-    user_id:res.user_id||res.kasir_id||(STATE.user&&STATE.user.id),
+    user_id:res.user_id||res.kasir_id||(payload&&payload.user_id)||(STATE.user&&STATE.user.id),
+    kasir_nama:res.kasir_nama||(payload&&payload.kasir_nama)||'',
     subtotal:res.subtotal!=null?res.subtotal:(tot&&tot.sub),
     diskon:res.diskon!=null?res.diskon:(payload&&payload.diskon),
     total:res.total!=null?res.total:(tot&&tot.total),
@@ -6926,5 +7028,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd1a0ae834aedc',t:'MTc5NTU3MjQ2Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd1a0ae834aedc',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd28774c79fd30',t:'MTc5NTU3MzA1Nw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd28774c79fd30',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
