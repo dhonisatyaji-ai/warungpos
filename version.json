@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.67",
+  "version": "2026.09.06.68",
   "tanggal": "2026-09-10",
-  "catatan": "Pembayaran kembali popup. Tanggal kasir tetap di keranjang."
+  "catatan": "Keranjang: kasir, pelanggan, tanggal rapi berjajar."
 }
