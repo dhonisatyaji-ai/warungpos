@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.06.61",
+  "version": "2026.09.06.62",
   "tanggal": "2026-09-10",
-  "catatan": "Kasir: pop-up jumlah sebelum keranjang, keranjang lebih lebar, font lebih kecil."
+  "catatan": "Kasir: diskon/potongan harga per item di keranjang."
 }
