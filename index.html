@@ -218,10 +218,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--forest-2);box-shadow:
 .cart .kembali-box span{font-size:11px}
 .cart .kembali-box b{font-size:14px}
 .cart .fld{margin:8px 0 4px}
-.cart-meta{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px}
+.cart-meta{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px}
+.cart-meta-2{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;align-items:start}
+.cart-meta-col{display:flex;flex-direction:column;gap:6px;min-width:0}
 .cart-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:center}
+@media(max-width:720px){.cart-meta-2{grid-template-columns:1fr}}
 .cart-row > label{margin:0;font-size:12px;font-weight:700;color:#57534e;line-height:1.2}
-.cart-row select,.cart-row input[type=datetime-local]{width:100%;margin:0;padding:8px 10px;border-radius:10px;min-width:0}
+.cart-row select,.cart-row input{width:100%;margin:0;padding:8px 10px;border-radius:10px;min-width:0}
+#payNomor{background:#f5f0e8;font-weight:800;letter-spacing:.02em}
 .cart-row .pel-row{min-width:0}
 #btnCariKasir{width:100%;text-align:left;padding:8px 10px;border-radius:10px;font-weight:700}
 .pel-row{display:flex;gap:8px;align-items:stretch}
@@ -593,25 +597,35 @@ html.has-session .boot-splash:not(.hide){display:grid}
             <button type="button" class="act-clear" onclick="clearCart()">Kosongkan</button>
           </div>
           <div class="cart-meta">
-            <div class="cart-row" id="rowKasir">
-              <label>Nama kasir</label>
-              <select id="payKasir" onchange="onPayKasirUbah()"></select>
-              <input id="payKasirNama" type="hidden">
-            </div>
-            <div class="cart-row">
-              <label>Pelanggan</label>
-              <div class="pel-row">
-                <select id="pelangganKasir" tabindex="1"><option value="P0" selected>Umum</option></select>
-                <button type="button" class="btn" title="Tambah pelanggan" onclick="openPelanggan()">+</button>
+            <div class="cart-meta-2">
+              <div class="cart-meta-col">
+                <div class="cart-row" id="rowKasir">
+                  <label>Nama kasir</label>
+                  <select id="payKasir" onchange="onPayKasirUbah()"></select>
+                  <input id="payKasirNama" type="hidden">
+                </div>
+                <div class="cart-row">
+                  <label>Pelanggan</label>
+                  <div class="pel-row">
+                    <select id="pelangganKasir" tabindex="1"><option value="P0" selected>Umum</option></select>
+                    <button type="button" class="btn" title="Tambah pelanggan" onclick="openPelanggan()">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="cart-meta-col">
+                <div class="cart-row">
+                  <label>No. invoice</label>
+                  <input id="payNomor" readonly tabindex="-1">
+                </div>
+                <div class="cart-row" id="rowTgl">
+                  <label>Tanggal</label>
+                  <input id="payTgl" type="datetime-local" onchange="isiNomorKasir()">
+                </div>
               </div>
             </div>
             <div class="cart-row">
               <label>Cari</label>
               <button type="button" class="btn" id="btnCariKasir" tabindex="2" onclick="bukaCariKasir()">Cari produk (F2)</button>
-            </div>
-            <div class="cart-row" id="rowTgl">
-              <label>Tanggal</label>
-              <input id="payTgl" type="datetime-local">
             </div>
           </div>
           </div>
@@ -1104,7 +1118,7 @@ html.has-session .boot-splash:not(.hide){display:grid}
 
 <script>
 /* ================= CONFIG & STATE ================= */
-const APP_VERSION = '2026.09.06.69';
+const APP_VERSION = '2026.09.06.70';
 const CONFIG = { SB_URL: '', SB_KEY: '', GAS_URL: '', UPDATE_REPO: 'dhonisatyaji-ai/warungpos' };
 function readSb(){
   var url = ((document.getElementById('loginSbUrl')||{}).value || (document.getElementById('setSbUrl')||{}).value || localStorage.getItem('warungpos_sb_url') || window.WARUNGPOS_SB_URL || CONFIG.SB_URL || '').trim();
@@ -3281,6 +3295,7 @@ function renderCart(){
   try{ syncDiskonLock(); }catch(e){}
   if(STATE.user) saveSession();
   try{ syncPayPas(); }catch(e){}
+  try{ isiNomorKasir(); }catch(e){}
 }
 function syncDiskonKet(tot){
   tot=tot||{};
@@ -3605,6 +3620,13 @@ function isiPanelBayarKasir(){
     if(!pt.value) pt.value=isoToLocalInput(nowIso());
     pt.disabled=!admin;
   }
+  isiNomorKasir();
+}
+function isiNomorKasir(){
+  var el=document.getElementById('payNomor');
+  if(!el) return;
+  var tgl=(document.getElementById('payTgl')||{}).value||nowIso();
+  el.value=nextNomorJual(tgl);
 }
 function syncPayPas(){
   var tot=0;
@@ -3792,7 +3814,7 @@ async function prosesBayar(){
     catatanBayar=catatanBayar?catatanBayar+' · '+note:note;
   }
   const adm=bacaBayarAdmin();
-  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar,user_id:adm.user_id,tanggal:adm.tanggal,kasir_nama:adm.kasir_nama,nomor:nextNomorJual(adm.tanggal)};
+  const payload={items,pelanggan_id,metode,metode2:metode==='campuran'?metode2:'',bayar,bayar2:metode==='campuran'?roundM(t.total-bayar):0,diskon:useSb()?roundM(t.diskon+num(t.diskonItem)):t.diskon,catatan:catatanBayar,user_id:adm.user_id,tanggal:adm.tanggal,kasir_nama:adm.kasir_nama,nomor:(document.getElementById('payNomor')&&document.getElementById('payNomor').value)||nextNomorJual(adm.tanggal)};
   window._bayarLock=true;
   const slow=!useSb() && !onAppsScript() && !window._wpBridgeOk && !!gasUrl();
   try{
@@ -7180,5 +7202,5 @@ try{ gabungSupplierDuplikat(); }catch(e){}
   }catch(e){}
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd83cd0ef05f31',t:'MTc5NTU3Njc5OA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd83cd0ef05f31',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5fd93b21f8fc390',t:'MTc5NTU3NzQ0OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5fd93b21f8fc390',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
